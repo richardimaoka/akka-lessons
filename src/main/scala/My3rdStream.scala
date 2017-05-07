@@ -24,6 +24,6 @@ object My3rdStream {
     //beginner tips: {} == (), nicer syntax for passing closure
 
     Thread.sleep(1000)
-    system.terminate()
+    //system.terminate()
   }
 }
