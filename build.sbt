@@ -23,6 +23,7 @@ lazy val lesson1 = (project in file(".")).
       "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.0",
       "com.typesafe.akka" %% "akka-testkit" % "2.5.0",
       "com.typesafe.akka" %% "akka-typed" % "2.5.0",
+      "com.typesafe.akka" %% "akka-http" % "10.0.6",
       "com.typesafe.akka" %% "akka-contrib" % "2.5.0"
     )
   )
