@@ -3,8 +3,10 @@ package my.stream
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{RunnableGraph, Sink, Source, SubFlow}
+import akka.stream.scaladsl.{Keep, RunnableGraph, Sink, Source, SubFlow}
+import akka.stream.testkit.scaladsl.TestSource
 import akka.stream.testkit.{TestPublisher, TestSubscriber}
+import my.wrapper.Wrapper
 
 import scala.collection.immutable
 import scala.concurrent.Await
@@ -26,21 +28,81 @@ object MyGroupBy {
     def lift(key: Int ⇒ Int) = f.prefixAndTail(1).map(p ⇒ key(p._1.head) → (Source.single(p._1.head) ++ p._2)).concatSubstreams
   }
 
+  /**
+   * See how Source.mapConcat() works .... flattening iterators inside
+   */
   def mapConcat(): Unit = {
-    val original = Source(1 to 10)
-
+    val original = Source(1 to 4)
     println("Source.map")
     original.map(x => List(x, x+100, x+200)).runForeach(println(_))
     Thread.sleep(50)
 
     println("Source.mapConcat")
     original.mapConcat(x => List(x, x+100, x+200)).runForeach(println(_))
-    Thread.sleep(50)
   }
 
-  def simple(): Unit ={
+  def publisherGroupBy(): Unit = {
+    /**
+     * Observe the sequence of printed out elements are not in the increasing order,
+     * as substreams can run asynchronously to each other
+     */
+    val publisher = TestSource.probe[Int]
+      .groupBy(8, _ % 8)
+      .to(Sink.foreach(x => print(s"${x}, ")))
+      .run()
+
+    for(i <- 1 to 20)
+      publisher.sendNext(i)
+    Thread.sleep(100)
+    println("")
+
+    /**
+     * grouped(10) in the middle chunks up elemtns: Int into
+     * multiple Seq[Int] with size = 10
+     */
+    val (sourcePublisher, sinkPublisher) = TestSource.probe[Int]
+      .groupBy(2, _ % 2)
+      .grouped(10)
+      .concatSubstreams
+      .toMat(Sink.asPublisher(false))(Keep.both)
+      .run()
+
+    /**
+     * subscriber of Seq[Int] as grouped(10) will emit Seq[Int],
+     * if there are 10 elements or upstream completes
+     */
+    val sinkSubscriber = TestSubscriber.manualProbe[Seq[Int]]()
+    sinkPublisher.subscribe(sinkSubscriber)
+    val subscription = sinkSubscriber.expectSubscription()
+
+    for(i <- 1 to 11)
+      sourcePublisher.sendNext(i)
+
+    /**
+     * Due to grouped(10) in the middle, elements are not emitted to the sink
+     * as it does not exceed the 10 elements
+     */
+    subscription.request(50)
+    sinkSubscriber.expectNoMsg(200 milliseconds)
+
+    subscription.request(6)
+    sinkSubscriber.expectNoMsg(200 milliseconds)
+
+    /**
+     * This should let the grouped(10) stream emit the first Seq[Int] with the size 10
+     */
+//    subscription.request(6)
+//    sourcePublisher.sendComplete()
+
+  }
+
+  /**
+   * groupBy() closed with runForeach sink works like a normal stream
+   * (i.e.) not a good example to demonstrate groupBy()
+   */
+  def simpleButNotADecentExample(): Unit ={
     val topicMapperr: Int => String = (msg: Int) => if( msg.equals(1) ) "1" else "10"
-    val listSource  = Source(1 to 20)
+    val listSource  = Source(1 to 5)
 
     println("listSource.groupBy(1, topicMapperr)")
     println(listSource.groupBy(1, topicMapperr))
@@ -48,6 +110,11 @@ object MyGroupBy {
 
     println("listSource.runForeach(x => println(x))")
     listSource.runForeach(x => println(x))
+    /**
+     * From the API doc
+     * Substream mode is exited either by closing the substream (i.e. connecting it to a [[Sink]]) <- this is happening in this example
+     * (or by merging the substreams back together)
+     */
     Thread.sleep(50)
   }
 
@@ -79,6 +146,7 @@ object MyGroupBy {
     println("elemsBase.foreach(msg => println(extractTopics(msg)))")
     elemsBase.foreach(msg => println(extractTopics(msg)))
     Thread.sleep(50)
+
     //Hmm, topicMapper === extractTopics !?
     val topicMapper: (Message) => immutable.Seq[Topic] = extractTopics
     println("elemsBase.foreach(msg => println(topicMapper(msg)))")
@@ -106,13 +174,20 @@ object MyGroupBy {
     Thread.sleep(50)
 
     val multiGroups = messageAndTopic
-      .groupBy(2, _._2).map {
-      case (msg, topic) =>
-        // do what needs to be done
-        println(s"split into: msg = ${msg}, topic=${topic}")
-        (msg, topic)
-    }
+      // As messageAndTopic: Source[(Message, Topic), NotUsed],
+      // groupBy pushes through elements : (Message, Topic)
+      .groupBy(2, _._2)  //_._2 means that the topic is the second element of tuple (Message, Topic)
+      .map {
+        case (msg, topic) =>
+          // do what needs to be done
+          println(s"split into: msg = ${msg}, topic=${topic}")
+          (msg, topic)
+      }
     println("multiGroups.map(println(_))")
+    /**
+     * From the API doc
+     * Substream mode is exited either by closing the substream (i.e. connecting it to a [[Sink]]) <- this is happening in this example
+     */
     multiGroups.to(Sink.foreach(println(_)))
     Thread.sleep(50)
 
@@ -211,14 +286,10 @@ object MyGroupBy {
 
   def main(args: Array[String]): Unit = {
     try {
-      //simple()
-      //println("\n\n")
-
-      mapConcat()
-      println("\n\n")
-
-      recipeMultiGroupBy()
-      println("\n\n")
+      Wrapper("mapConcat")(mapConcat)
+      Wrapper("publisherGroupBy")(publisherGroupBy)
+      Wrapper("simpleButNotADecentExample")(simpleButNotADecentExample)
+      Wrapper("recipeMultiGroupBy")(recipeMultiGroupBy)
 //      flowGroupBySpec()
 //      println("\n\n")
 //      substreamSubscriptionTimeoutSpec()
