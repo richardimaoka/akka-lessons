@@ -1,5 +1,8 @@
 package my.stream
 
+import java.text.NumberFormat
+import java.util.Locale
+
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.Logging
@@ -37,6 +40,8 @@ class MyThrottle[T](
   private val timerName: String = "ThrottleTimer"
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new TimerGraphStageLogic(shape) {
+    println(s"nanosBetweenTokens = ${NumberFormat.getNumberInstance(Locale.US).format(nanosBetweenTokens)}")
+    println(s"maximumBurst = ${maximumBurst}")
     private val tokenBucket = new NanoTimeTokenBucket(maximumBurst, nanosBetweenTokens)
 
     var willStop = false
@@ -60,6 +65,7 @@ class MyThrottle[T](
           val elem = grab(in)
           val cost = costCalculation(elem)
           val delayNanos = tokenBucket.offer(cost)
+          println(s"delayNanos: ${NumberFormat.getNumberInstance(Locale.US).format(delayNanos)}, cost = ${cost}")
 
           if (delayNanos == 0L) push(out, elem)
           else {
@@ -71,7 +77,10 @@ class MyThrottle[T](
           }
         }
 
-        override def onPull(): Unit = pull(in)
+        override def onPull(): Unit = {
+          println("pull(in)")
+          pull(in)
+        }
       }
 
       setHandler(in, handler)
@@ -95,12 +104,15 @@ object MyThrottle {
   implicit val materializer = ActorMaterializer()
 
   def throttle(): Unit ={
-    val mat1 = Source(1 to 10).throttle(5, 2000 milliseconds, 5, i => 1, ThrottleMode.Shaping).runForeach(println(_))
-    Thread.sleep(1000)
+    /**
+     * 5 / 500 milliseconds = 10 elements / 1 second
+     */
+    val mat1 = Source(1 to 10).throttle(5, 500 milliseconds, 2, i => 1, ThrottleMode.Shaping).runForeach(println(_))
+    Thread.sleep(2000)
     println(mat1) //runForeach materializes to Future[Done]
 
-    val mat2 = Source(1 to 10).throttle(5, 2000 milliseconds, 5, i => 1, ThrottleMode.Enforcing).runForeach(println(_))
-    Thread.sleep(1000)
+    val mat2 = Source(1 to 10).throttle(5, 500 milliseconds, 2, i => 1, ThrottleMode.Enforcing).runForeach(println(_))
+    Thread.sleep(2000)
     println(mat2) //runForeach materializes to Future[Done]
     /**
      * However, due to ThrottleMode.Enforcing, too-fast upstram causes exception in the stream,
@@ -131,7 +143,7 @@ object MyThrottle {
      */
     val (sourcePublisher, sinkPublisher) = TestSource.probe[Int]
       .map(x => {println(s"Before throttle ${x}"); x})
-      .via(new MyThrottle(2, 2000 milliseconds, 100, (_: Int) ⇒ 1, ThrottleMode.Enforcing))
+      .via(new MyThrottle(8, 2000 milliseconds, 2, (_: Int) ⇒  2, ThrottleMode.Enforcing))
       .map(x => {println(s"After  throttle ${x}"); x})
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()
@@ -149,7 +161,7 @@ object MyThrottle {
 
   def main(args: Array[String]): Unit = {
     try {
-      Wrapper("throttle")(throttle)
+      //Wrapper("throttle")(throttle)
       Wrapper("throttle2")(throttle2)
     }
     finally{
