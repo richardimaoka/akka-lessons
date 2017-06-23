@@ -5,6 +5,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.testkit.scaladsl.TestSource
 import akka.testkit.TestProbe
+import my.wrapper.Wrapper
 
 import scala.util.{Failure, Success}
 
@@ -42,12 +43,6 @@ object MyactorRefWithAck {
         sender() ! ackMessage
         testActor forward msg
     }
-  }
-
-  def wrapper(callerFunctionName: String = "f")(unitFunction: () => Unit): Unit = {
-    unitFunction()
-    Thread.sleep(50)
-    println("\n\n")
   }
 
   /**
@@ -170,11 +165,11 @@ object MyactorRefWithAck {
 
   def main(args: Array[String]): Unit = {
     try {
-      wrapper("fixedSource")(fixedSource)
-      wrapper("publisherSource")(publisherSource)
-      wrapper("publisherSourceCancellation")(publisherSourceCancellation)
-      wrapper("watchTermination")(watchTermination)
-      wrapper("watchTerminationFailure")(watchTerminationFailure)
+      Wrapper("fixedSource")(fixedSource)
+      Wrapper("publisherSource")(publisherSource)
+      Wrapper("publisherSourceCancellation")(publisherSourceCancellation)
+      Wrapper("watchTermination")(watchTermination)
+      Wrapper("watchTerminationFailure")(watchTerminationFailure)
     }
     finally{
       println("terminating the system")
