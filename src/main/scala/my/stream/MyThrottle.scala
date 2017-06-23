@@ -15,6 +15,7 @@ import akka.stream.testkit.scaladsl.TestSource
 import akka.util.NanoTimeTokenBucket
 import my.wrapper.Wrapper
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class MyThrottle[T](
@@ -40,8 +41,8 @@ class MyThrottle[T](
   private val timerName: String = "ThrottleTimer"
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new TimerGraphStageLogic(shape) {
-    println(s"nanosBetweenTokens = ${NumberFormat.getNumberInstance(Locale.US).format(nanosBetweenTokens)}")
-    println(s"maximumBurst = ${maximumBurst}")
+    //println(s"nanosBetweenTokens = ${NumberFormat.getNumberInstance(Locale.US).format(nanosBetweenTokens)}")
+    //println(s"maximumBurst = ${maximumBurst}")
     private val tokenBucket = new NanoTimeTokenBucket(maximumBurst, nanosBetweenTokens)
 
     var willStop = false
@@ -65,7 +66,7 @@ class MyThrottle[T](
           val elem = grab(in)
           val cost = costCalculation(elem)
           val delayNanos = tokenBucket.offer(cost)
-          println(s"delayNanos: ${NumberFormat.getNumberInstance(Locale.US).format(delayNanos)}, cost = ${cost}")
+          println(s"delayNanos: ${NumberFormat.getNumberInstance(Locale.US).format(delayNanos)}, elem = ${elem}, cost(Calc'd) = ${cost}")
 
           if (delayNanos == 0L) push(out, elem)
           else {
@@ -78,7 +79,7 @@ class MyThrottle[T](
         }
 
         override def onPull(): Unit = {
-          println("pull(in)")
+          //println("pull(in)")
           pull(in)
         }
       }
@@ -136,15 +137,19 @@ object MyThrottle {
     Thread.sleep(2000)
   }
 
-  def throttle2(): Unit ={
+  def throttle2(cost: Int, per: FiniteDuration, maxBurst: Int, costCalc: Int)(): Unit ={
+    val nanoBetweenTokens = NumberFormat.getNumberInstance(Locale.US).format(per.toNanos / cost)
+    println(s"cost = ${cost}, per = ${per}, maxBurst = ${maxBurst}, costCalc = ${costCalc}, nanosBetweenTokens = $nanoBetweenTokens}")
+
     /**
      * From the API doc: Sends elements downstream with speed limited to `elements/per`
      * the buffer size > 5, it backpressures upstream (Before Buffer)
      */
-    val (sourcePublisher, sinkPublisher) = TestSource.probe[Int]
-      .map(x => {println(s"Before throttle ${x}"); x})
-      .via(new MyThrottle(8, 2000 milliseconds, 2, (_: Int) ⇒  2, ThrottleMode.Enforcing))
-      .map(x => {println(s"After  throttle ${x}"); x})
+    val ((sourcePublisher, fut), sinkPublisher) = TestSource.probe[Int]
+      //.map(x => {println(s"Before throttle ${x}"); x})
+      .via(new MyThrottle(cost, per, maxBurst, (_: Int) ⇒ costCalc, ThrottleMode.Shaping))
+      //.map(x => {println(s"After  throttle ${x}"); x})
+      .watchTermination()(Keep.both)
       .toMat(Sink.asPublisher(false))(Keep.both)
       .run()
 
@@ -152,17 +157,102 @@ object MyThrottle {
     sinkPublisher.subscribe(sinkSubscriber)
     val sinkSubscription = sinkSubscriber.expectSubscription()
 
-    sinkSubscription.request(2)
-    for(i <- 1 to 20)
+    sinkSubscription.request(10)
+    for(i <- 1 to 10)
       sourcePublisher.sendNext(i)
-    Thread.sleep(100)
+    sourcePublisher.sendComplete()
+
+    val result = Await.result(fut, 20 seconds)
+    println(s"result = ${result}")
   }
 
 
   def main(args: Array[String]): Unit = {
     try {
-      //Wrapper("throttle")(throttle)
-      Wrapper("throttle2")(throttle2)
+      Wrapper("throttle2")(throttle2(3, 2 seconds, 1, 1))
+      /**
+       * ----throttle2-----------------------------------------------
+       * cost = 3, per = 2 seconds, maxBurst = 1, costCalc = 1, nanosBetweenTokens = 666,666,666}
+       * delayNanos: 0, elem = 1, cost(Calc'd) = 1           <----- the 1st element has no delayNanos
+       * delayNanos: 654,398,196, elem = 2, cost(Calc'd) = 1 <----- from the 2nd, delayNanos = (nearly) nanosBetweenTokens
+       * delayNanos: 635,666,628, elem = 3, cost(Calc'd) = 1
+       * delayNanos: 648,665,538, elem = 4, cost(Calc'd) = 1
+       * delayNanos: 647,081,762, elem = 5, cost(Calc'd) = 1
+       * delayNanos: 643,085,818, elem = 6, cost(Calc'd) = 1
+       * delayNanos: 642,251,714, elem = 7, cost(Calc'd) = 1
+       * delayNanos: 636,676,202, elem = 8, cost(Calc'd) = 1
+       * delayNanos: 642,899,826, elem = 9, cost(Calc'd) = 1
+       * delayNanos: 639,450,736, elem = 10, cost(Calc'd) = 1
+       * result = Done
+       */
+
+      Wrapper("throttle2")(throttle2(3, 2 seconds, 2, 1))
+      /**
+       * ----throttle2-----------------------------------------------
+       * cost = 3, per = 2 seconds, maxBurst = 2, costCalc = 1, nanosBetweenTokens = 666,666,666}
+       * delayNanos: 0, elem = 1, cost(Calc'd) = 1
+       * delayNanos: 0, elem = 2, cost(Calc'd) = 1           <----- delayNanos = 0 for 2 elems, as maxBurst = 2
+       * delayNanos: 648,751,774, elem = 3, cost(Calc'd) = 1
+       * delayNanos: 652,537,989, elem = 4, cost(Calc'd) = 1
+       * delayNanos: 640,396,017, elem = 5, cost(Calc'd) = 1
+       * delayNanos: 635,426,852, elem = 6, cost(Calc'd) = 1
+       * delayNanos: 644,962,851, elem = 7, cost(Calc'd) = 1
+       * delayNanos: 638,887,958, elem = 8, cost(Calc'd) = 1
+       * delayNanos: 647,209,159, elem = 9, cost(Calc'd) = 1
+       * delayNanos: 646,610,924, elem = 10, cost(Calc'd) = 1
+       * result = Done
+       */
+
+      Wrapper("throttle2")(throttle2(3, 2 seconds, 3, 1))
+      /**
+       * ----throttle2-----------------------------------------------
+       * cost = 3, per = 2 seconds, maxBurst = 3, costCalc = 1, nanosBetweenTokens = 666,666,666}
+       * delayNanos: 0, elem = 1, cost(Calc'd) = 1
+       * delayNanos: 0, elem = 2, cost(Calc'd) = 1
+       * delayNanos: 0, elem = 3, cost(Calc'd) = 1            <----- delayNanos = 0 for 3 elems, as maxBurst = 3
+       * delayNanos: 650,203,643, elem = 4, cost(Calc'd) = 1
+       * delayNanos: 642,999,886, elem = 5, cost(Calc'd) = 1
+       * delayNanos: 636,589,970, elem = 6, cost(Calc'd) = 1
+       * delayNanos: 644,135,059, elem = 7, cost(Calc'd) = 1
+       * delayNanos: 642,790,457, elem = 8, cost(Calc'd) = 1
+       * delayNanos: 636,439,734, elem = 9, cost(Calc'd) = 1
+       * delayNanos: 644,724,578, elem = 10, cost(Calc'd) = 1
+       * result = Done
+       */
+
+      Wrapper("throttle2")(throttle2(3, 2 seconds, 3, 2))
+      /**
+       * ----throttle2-----------------------------------------------
+       * cost = 3, per = 2 seconds, maxBurst = 3, costCalc = 2, nanosBetweenTokens = 666,666,666}
+       * delayNanos: 0, elem = 1, cost(Calc'd) = 2
+       * delayNanos: 654,376,263, elem = 2, cost(Calc'd) = 2
+       * delayNanos: 1,312,084,731, elem = 3, cost(Calc'd) = 2 <----- from the 3rd, delayNanos = (nearly) costCalc x nanosBetweenTokens
+       * delayNanos: 1,306,896,823, elem = 4, cost(Calc'd) = 2
+       * delayNanos: 1,310,710,681, elem = 5, cost(Calc'd) = 2
+       * delayNanos: 1,304,131,300, elem = 6, cost(Calc'd) = 2
+       * delayNanos: 1,307,082,209, elem = 7, cost(Calc'd) = 2
+       * delayNanos: 1,313,079,879, elem = 8, cost(Calc'd) = 2
+       * delayNanos: 1,312,314,582, elem = 9, cost(Calc'd) = 2
+       * delayNanos: 1,306,504,402, elem = 10, cost(Calc'd) = 2
+       * result = Done
+       */
+
+      Wrapper("throttle2")(throttle2(3, 2 seconds, 3, 3))
+      /**
+       * ----throttle2-----------------------------------------------
+       * cost = 3, per = 2 seconds, maxBurst = 3, costCalc = 3, nanosBetweenTokens = 666,666,666}
+       * delayNanos: 0, elem = 1, cost(Calc'd) = 3
+       * delayNanos: 1,988,257,951, elem = 2, cost(Calc'd) = 3 <----- from the 2nd, delayNanos = (nearly) costCalc x nanosBetweenTokens
+       * delayNanos: 1,973,537,048, elem = 3, cost(Calc'd) = 3
+       * delayNanos: 1,976,589,215, elem = 4, cost(Calc'd) = 3
+       * delayNanos: 1,976,252,086, elem = 5, cost(Calc'd) = 3
+       * delayNanos: 1,976,146,619, elem = 6, cost(Calc'd) = 3
+       * delayNanos: 1,976,220,232, elem = 7, cost(Calc'd) = 3
+       * delayNanos: 1,976,235,554, elem = 8, cost(Calc'd) = 3
+       * delayNanos: 1,974,231,120, elem = 9, cost(Calc'd) = 3
+       * delayNanos: 1,973,754,574, elem = 10, cost(Calc'd) = 3
+       * result = Done
+       */
     }
     finally{
       system.terminate()
