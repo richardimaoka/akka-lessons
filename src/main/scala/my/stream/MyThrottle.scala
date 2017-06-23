@@ -2,26 +2,104 @@ package my.stream
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.Source
-import akka.stream.{ActorMaterializer, ThrottleMode}
+import akka.event.Logging
+import akka.stream.ThrottleMode.{Enforcing, Shaping}
+import akka.stream._
+import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.stage._
+import akka.stream.testkit.TestSubscriber
+import akka.stream.testkit.scaladsl.TestSource
+import akka.util.NanoTimeTokenBucket
 import my.wrapper.Wrapper
 
 import scala.concurrent.duration._
 
-/**
-  * Materialization
-  */
+class MyThrottle[T](
+                   val cost:            Int,
+                   val per:             FiniteDuration,
+                   val maximumBurst:    Int,
+                   val costCalculation: (T) ⇒ Int,
+                   val mode:            ThrottleMode)
+  extends GraphStage[FlowShape[T,T]] {
+  require(cost > 0, "cost must be > 0")
+  require(per.toNanos > 0, "per time must be > 0")
+  require(!(mode == ThrottleMode.Enforcing && maximumBurst < 0), "maximumBurst must be > 0 in Enforcing mode")
+  require(per.toNanos >= cost, "Rates larger than 1 unit / nanosecond are not supported")
+
+  val in = Inlet[T](Logging.simpleName(this) + ".in")
+  val out = Outlet[T](Logging.simpleName(this) + ".out")
+  override val shape = FlowShape(in, out)
+
+  // There is some loss of precision here because of rounding, but this only happens if nanosBetweenTokens is very
+  // small which is usually at rates where that precision is highly unlikely anyway as the overhead of this stage
+  // is likely higher than the required accuracy interval.
+  private val nanosBetweenTokens = per.toNanos / cost
+  private val timerName: String = "ThrottleTimer"
+
+  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new TimerGraphStageLogic(shape) {
+    private val tokenBucket = new NanoTimeTokenBucket(maximumBurst, nanosBetweenTokens)
+
+    var willStop = false
+    var currentElement: T = _
+    val enforcing = mode match {
+      case Enforcing ⇒ true
+      case Shaping   ⇒ false
+    }
+
+    override def preStart(): Unit = tokenBucket.init()
+
+    // This scope is here just to not retain an extra reference to the handler below.
+    // We can't put this code into preRestart() because setHandler() must be called before that.
+    {
+      val handler = new InHandler with OutHandler {
+        override def onUpstreamFinish(): Unit =
+          if (isAvailable(out) && isTimerActive(timerName)) willStop = true
+          else completeStage()
+
+        override def onPush(): Unit = {
+          val elem = grab(in)
+          val cost = costCalculation(elem)
+          val delayNanos = tokenBucket.offer(cost)
+
+          if (delayNanos == 0L) push(out, elem)
+          else {
+            if (enforcing) failStage(new RateExceededException("Maximum throttle throughput exceeded."))
+            else {
+              currentElement = elem
+              scheduleOnce(timerName, delayNanos.nanos)
+            }
+          }
+        }
+
+        override def onPull(): Unit = pull(in)
+      }
+
+      setHandler(in, handler)
+      setHandler(out, handler)
+      // After this point, we no longer need the `handler` so it can just fall out of scope.
+    }
+
+    override protected def onTimer(key: Any): Unit = {
+      push(out, currentElement)
+      currentElement = null.asInstanceOf[T]
+      if (willStop) completeStage()
+    }
+
+  }
+
+  override def toString = "Throttle"
+}
 
 object MyThrottle {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
   def throttle(): Unit ={
-    val mat1 = Source(1 to 10).throttle(5, 500 milliseconds, 5, i => 1, ThrottleMode.Shaping).runForeach(println(_))
+    val mat1 = Source(1 to 10).throttle(5, 2000 milliseconds, 5, i => 1, ThrottleMode.Shaping).runForeach(println(_))
     Thread.sleep(1000)
     println(mat1) //runForeach materializes to Future[Done]
 
-    val mat2 = Source(1 to 10).throttle(5, 500 milliseconds, 5, i => 1, ThrottleMode.Enforcing).runForeach(println(_))
+    val mat2 = Source(1 to 10).throttle(5, 2000 milliseconds, 5, i => 1, ThrottleMode.Enforcing).runForeach(println(_))
     Thread.sleep(1000)
     println(mat2) //runForeach materializes to Future[Done]
     /**
@@ -46,10 +124,33 @@ object MyThrottle {
     Thread.sleep(2000)
   }
 
+  def throttle2(): Unit ={
+    /**
+     * From the API doc: Sends elements downstream with speed limited to `elements/per`
+     * the buffer size > 5, it backpressures upstream (Before Buffer)
+     */
+    val (sourcePublisher, sinkPublisher) = TestSource.probe[Int]
+      .map(x => {println(s"Before throttle ${x}"); x})
+      .via(new MyThrottle(2, 2000 milliseconds, 100, (_: Int) ⇒ 1, ThrottleMode.Enforcing))
+      .map(x => {println(s"After  throttle ${x}"); x})
+      .toMat(Sink.asPublisher(false))(Keep.both)
+      .run()
+
+    val sinkSubscriber = TestSubscriber.manualProbe[Int]()
+    sinkPublisher.subscribe(sinkSubscriber)
+    val sinkSubscription = sinkSubscriber.expectSubscription()
+
+    sinkSubscription.request(2)
+    for(i <- 1 to 20)
+      sourcePublisher.sendNext(i)
+    Thread.sleep(100)
+  }
+
+
   def main(args: Array[String]): Unit = {
     try {
       Wrapper("throttle")(throttle)
-      Wrapper("throttleZipWith")(throttleZipWith)
+      Wrapper("throttle2")(throttle2)
     }
     finally{
       system.terminate()
