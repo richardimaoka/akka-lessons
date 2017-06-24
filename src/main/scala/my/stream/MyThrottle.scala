@@ -169,6 +169,10 @@ object MyThrottle {
 
   def main(args: Array[String]): Unit = {
     try {
+      Wrapper("throttle")(throttle)
+
+      Wrapper("throttleZipWith")(throttleZipWith)
+
       Wrapper("throttle2")(throttle2(3, 2 seconds, 1, 1))
       /**
        * ----throttle2-----------------------------------------------
