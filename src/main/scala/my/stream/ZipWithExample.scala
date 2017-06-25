@@ -6,6 +6,8 @@ import akka.stream.scaladsl._
 import akka.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import my.wrapper.Wrapper
 
+import scala.collection.immutable
+
 class MyCounter[T](prefix: String) extends GraphStage[FlowShape[T, T]] {
   val in = Inlet[T]("MyCounter.in")
   val out = Outlet[T]("MyCounter.out")
@@ -30,6 +32,86 @@ class MyCounter[T](prefix: String) extends GraphStage[FlowShape[T, T]] {
     }
 }
 
+object MyBroadcast {
+  def apply[T](outputPorts: Int, eagerCancel: Boolean = false): MyBroadcast[T] =
+    new MyBroadcast(outputPorts, eagerCancel)
+}
+
+class MyBroadcast[T](val outputPorts: Int, val eagerCancel: Boolean) extends GraphStage[UniformFanOutShape[T, T]] {
+  // one output might seem counter intuitive but saves us from special handling in other places
+  require(outputPorts >= 1, "A Broadcast must have one or more output ports")
+  val in: Inlet[T] = Inlet[T]("MyBroadcast.in")
+  val out: immutable.IndexedSeq[Outlet[T]] = Vector.tabulate(outputPorts)(i ⇒ Outlet[T]("MyBroadcast.out" + i))
+  override def initialAttributes = Attributes.name("MyBroadcast")
+  override val shape: UniformFanOutShape[T, T] = UniformFanOutShape(in, out: _*)
+
+  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) with InHandler {
+    private var pendingCount = outputPorts
+    private val pending = Array.fill[Boolean](outputPorts)(true)
+    private var downstreamsRunning = outputPorts
+
+    def onPush(): Unit = {
+      println("MyBroadcast: onPush")
+      pendingCount = downstreamsRunning
+      val elem = grab(in)
+
+      val size = out.size
+      var idx = 0
+      while (idx < size) {
+        val o = out(idx)
+        if (!isClosed(o)) {
+          println(s"MyBroadcast: push ${idx}, elem = ${elem}")
+          push(o, elem)
+          pending(idx) = true
+        }
+        idx += 1
+      }
+    }
+
+    setHandler(in, this)
+
+    private def tryPull(): Unit =
+      if (pendingCount == 0 && !hasBeenPulled(in)) {
+        println(s"MyBroadcast: pull")
+        pull(in)
+      }
+
+    {
+      val size = out.size
+      var idx = 0
+      while (idx < size) {
+        val o = out(idx)
+        val i = idx // close over val
+        setHandler(o, new OutHandler {
+          override def onPull(): Unit = {
+            println(s"MyBroadcast: onPull ${i}, pending = ${pendingCount}")
+            pending(i) = false
+            pendingCount -= 1
+            tryPull()
+          }
+
+          override def onDownstreamFinish() = {
+            if (eagerCancel) completeStage()
+            else {
+              downstreamsRunning -= 1
+              if (downstreamsRunning == 0) completeStage()
+              else if (pending(i)) {
+                pending(i) = false
+                pendingCount -= 1
+                tryPull()
+              }
+            }
+          }
+        })
+        idx += 1
+      }
+    }
+
+  }
+
+  override def toString = "MyBroadcast"
+
+}
 /** `ZipWith` specialized for 2 inputs */
 class MyZipWith2[A1, A2, O](val zipper: (A1, A2) ⇒ O) extends GraphStage[FanInShape2[A1, A2, O]] {
   override def initialAttributes = Attributes.name("ZipWith2")
@@ -44,21 +126,25 @@ class MyZipWith2[A1, A2, O](val zipper: (A1, A2) ⇒ O) extends GraphStage[FanIn
     var willShutDown = false
 
     private def pushAll(): Unit = {
+      println("MyZip: pushAll, calling push()")
       push(out, zipper(grab(in0), grab(in1)))
       if (willShutDown) completeStage()
       else {
+        println("MyZip: pull 0 & 1 from pushAll()")
         pull(in0)
         pull(in1)
       }
     }
 
     override def preStart(): Unit = {
+      println("MyZip: pull 0 & 1 from preStart()")
       pull(in0)
       pull(in1)
     }
 
     setHandler(in0, new InHandler {
       override def onPush(): Unit = {
+        println("MyZip: onPush in0")
         pending -= 1
         if (pending == 0) pushAll()
       }
@@ -71,6 +157,7 @@ class MyZipWith2[A1, A2, O](val zipper: (A1, A2) ⇒ O) extends GraphStage[FanIn
     })
     setHandler(in1, new InHandler {
       override def onPush(): Unit = {
+        println("MyZip: onPush in1")
         pending -= 1
         if (pending == 0) pushAll()
       }
@@ -84,6 +171,7 @@ class MyZipWith2[A1, A2, O](val zipper: (A1, A2) ⇒ O) extends GraphStage[FanIn
 
     setHandler(out, new OutHandler {
       override def onPull(): Unit = {
+        println(s"MyZip: onPull, pending = ${pending} to ${pending + shape.inlets.size}")
         pending += shape.inlets.size
         if (pending == 0) pushAll()
       }
@@ -97,6 +185,13 @@ class MyZip[A,B] extends MyZipWith2[A,B,(A,B)](Tuple2.apply){
   override def toString = "MyZip"
 }
 
+object MyZip {
+  /**
+   * Create a new `Zip`.
+   */
+  def apply[A, B](): MyZip[A, B] = new MyZip()
+}
+
 object ZipWithExample {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
@@ -107,6 +202,20 @@ object ZipWithExample {
 
       val broadcast = builder.add(Broadcast[In](2))
       val zip = builder.add(Zip[In, Out]())
+
+      broadcast.out(0) ~> zip.in0
+      broadcast.out(1) ~> flow ~> zip.in1
+
+      FlowShape(broadcast.in, zip.out)
+    })
+  }
+
+  private def myZipWithInput[In, Out, _](flow: Flow[In, Out, _]) = {
+    Flow.fromGraph(GraphDSL.create() { implicit builder =>
+      import GraphDSL.Implicits._
+
+      val broadcast = builder.add(MyBroadcast[In](2))
+      val zip = builder.add(MyZip[In, Out]())
 
       broadcast.out(0) ~> zip.in0
       broadcast.out(1) ~> flow ~> zip.in1
@@ -139,8 +248,8 @@ object ZipWithExample {
     Flow.fromGraph(GraphDSL.create() { implicit builder =>
       import GraphDSL.Implicits._
 
-      val broadcast = builder.add(Broadcast[T](2))
-      val zip = builder.add(Zip[T, T]())
+      val broadcast = builder.add(MyBroadcast[T](2))
+      val zip = builder.add(MyZip[T, T]())
 
       broadcast.out(0) ~> zip.in0
       broadcast.out(1) ~> zip.in1
@@ -156,18 +265,46 @@ object ZipWithExample {
   def testIssue(): Unit = {
     println("exampleOk.run()")
     exampleOk.run() ; Thread.sleep(500)
-    println("exampleFail.run()")
+    println("\nexampleFail.run()")
     exampleFail.run() ; Thread.sleep(500)
 
     def exampleOk = Source(List("AAA", "BBB", "CCC"))
+      .via(new MyCounter("upstream  "))
       .via(zipWithInput(simpleFlow))
+      .via(new MyCounter("downstream 1"))
       // Converting act: List[String] into List[Map[String, String]]
       // where "->" in (prev -> _) is a tuple creation operation
       .mapConcat { case (prev, act) => act.map(prev -> _)}
+      .via(new MyCounter("downstream 2"))
       .to(Sink.foreach(println))
 
     def exampleFail = Source(List("AAA", "BBB", "CCC"))
+      .via(new MyCounter("upstream  "))
       .via(zipWithInput(simpleFlow.mapConcat(a => a)))
+      .via(new MyCounter("downstream"))
+      .to(Sink.foreach(println))
+  }
+
+  def testIssueUsingMyStages(): Unit = {
+    println("exampleOk.run()")
+    exampleOk.run() ; Thread.sleep(500)
+    println("\nexampleFail.run()")
+    exampleFail.run() ; Thread.sleep(500)
+
+    def exampleOk = Source(List("AAA", "BBB", "CCC"))
+      .via(new MyCounter("upstream  "))
+      .via(myZipWithInput(simpleFlow))
+      .via(new MyCounter("downstream 1"))
+      // Converting act: List[String] into List[Map[String, String]]
+      // where "->" in (prev -> _) is a tuple creation operation
+      .mapConcat { case (prev, act) => act.map(prev -> _)}
+      .via(new MyCounter("downstream 2"))
+      .to(Sink.foreach(println))
+
+    def exampleFail = Source(List("AAA", "BBB", "CCC"))
+      .via(new MyCounter("upstream  "))
+      .via(myZipWithInput(simpleFlow.mapConcat(a => a)))
+      .via(new MyCounter("downstream"))
       .to(Sink.foreach(println))
   }
 
@@ -264,6 +401,9 @@ object ZipWithExample {
       .runForeach(println(_))
   }
 
+  /**
+   * This is the case not working
+   */
   def simpleFlowMapConcatZipWithInput(): Unit = {
     Source(List("AAA","BBB","CCC"))
       //def mapConcat[T](f: Out ⇒ immutable.Iterable[T]): Repr[T]
@@ -299,18 +439,19 @@ object ZipWithExample {
 
   def main(args: Array[String]): Unit = {
     try {
-      Wrapper("myCounterTest")(myCounterTest)
+//      Wrapper("myCounterTest")(myCounterTest)
       Wrapper("testsIssue")(testIssue)
-      Wrapper("investigate")(investigate)
-      Wrapper("mapConcatTest")(mapConcatTest)
-      Wrapper("simpleFlowTest")(simpleFlowTest)
-      Wrapper("simpleFlowZipWithInput")(simpleFlowZipWithInput)
-      Wrapper("simpleFlowZipWithInputMapConcat")(simpleFlowZipWithInputMapConcat)
-      Wrapper("simpleFlowMapConcat")(simpleFlowMapConcat)
-      Wrapper("simpleFlowMapConcatZipWithInput")(simpleFlowMapConcatZipWithInput)
-      Wrapper("zipWithInputPlainInput")(zipWithInputPlainInput)
-      Wrapper("bcastTest")(bcastTest)
-      Wrapper("bcastZipTest")(bcastZipTest)
+      Wrapper("testIssueUsingMyStages")(testIssueUsingMyStages)
+//      Wrapper("investigate")(investigate)
+//      Wrapper("mapConcatTest")(mapConcatTest)
+//      Wrapper("simpleFlowTest")(simpleFlowTest)
+//      Wrapper("simpleFlowZipWithInput")(simpleFlowZipWithInput)
+//      Wrapper("simpleFlowZipWithInputMapConcat")(simpleFlowZipWithInputMapConcat)
+//      Wrapper("simpleFlowMapConcat")(simpleFlowMapConcat)
+//      Wrapper("simpleFlowMapConcatZipWithInput")(simpleFlowMapConcatZipWithInput)
+//      Wrapper("zipWithInputPlainInput")(zipWithInputPlainInput)
+//      Wrapper("bcastTest")(bcastTest)
+//      Wrapper("bcastZipTest")(bcastZipTest)
     }
     finally {
       println("terminating the system")
