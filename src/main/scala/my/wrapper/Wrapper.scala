@@ -8,6 +8,6 @@ object Wrapper {
     unitFunction() // call the passed function
 
     Thread.sleep(50)
-    println("\n")
+    println()
   }
 }
