@@ -8,30 +8,6 @@ import my.wrapper.Wrapper
 
 import scala.collection.immutable
 
-class MyCounter[T](prefix: String) extends GraphStage[FlowShape[T, T]] {
-  val in = Inlet[T]("MyCounter.in")
-  val out = Outlet[T]("MyCounter.out")
-  override val shape = FlowShape(in, out)
-
-  override def initialAttributes: Attributes = Attributes.name("MyCounter")
-
-  override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
-    new GraphStageLogic(shape) with InHandler with OutHandler {
-      override def onPush(): Unit = {
-        val elem = grab(in)
-        println(s"${prefix} pushed: ${elem}")
-        push(out, elem)
-      }
-
-      override def onPull(): Unit = {
-        println(s"${prefix} pulled")
-        pull(in)
-      }
-
-      setHandlers(in, out, this)
-    }
-}
-
 object MyBroadcast {
   def apply[T](outputPorts: Int, eagerCancel: Boolean = false): MyBroadcast[T] =
     new MyBroadcast(outputPorts, eagerCancel)
@@ -106,12 +82,11 @@ class MyBroadcast[T](val outputPorts: Int, val eagerCancel: Boolean) extends Gra
         idx += 1
       }
     }
-
   }
 
   override def toString = "MyBroadcast"
-
 }
+
 /** `ZipWith` specialized for 2 inputs */
 class MyZipWith2[A1, A2, O](val zipper: (A1, A2) ⇒ O) extends GraphStage[FanInShape2[A1, A2, O]] {
   override def initialAttributes = Attributes.name("ZipWith2")
