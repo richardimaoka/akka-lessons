@@ -34,6 +34,18 @@ object SourceCombineTest {
     s1.concat(s2).runForeach(println(_))
   }
 
+  def compareCombineWithConcat2(): Unit ={
+    val s1 = Source(1 to 5)
+    val s2 = Source(6 to 10)
+
+    println("Below is combine")
+    Source.combine(s1, s2)(i => Concat(i)).runForeach(println(_))
+    Thread.sleep(100)
+
+    println("Below is concat")
+    s1.concat(s2).runForeach(println(_))
+  }
+
   def testCombineMemberMethod(): Unit ={
     val s1 = Source(1 to 5)
     val s2 = Source(6 to 10)
