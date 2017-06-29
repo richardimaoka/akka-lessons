@@ -15,6 +15,10 @@ object GraphDSLbuilderTest {
   implicit val materializer = ActorMaterializer()
 
   def test(): Unit ={
+    /**
+     * implicit builder: GraphDSL.Builder[NotUsed] is used by import GraphDSL.Implicits._
+     * which has methods like ~> ... jump to the definition of ~> and see
+     */
     val g = RunnableGraph.fromGraph(GraphDSL.create() { implicit builder: GraphDSL.Builder[NotUsed] =>
       import GraphDSL.Implicits._
       val in = Source(1 to 10)
@@ -132,6 +136,17 @@ object GraphDSLbuilderTest {
 
     promise.success(5)
     subscriber.expectNext()
+    println("ok - if you reached this point, no exception thrown up to here")
+  }
+
+  def testSimpleBuilder(): Unit = {
+    val sourceOne = Source(List(1))
+    val sourceTwo = Source(List(2))
+    val merged = Source.combine(sourceOne, sourceTwo)(Merge(_))
+
+    val mergedResult: Future[Int] = merged.runWith(Sink.fold(0)(_ + _))
+    val result = Await.result(mergedResult, 1 second)
+    println(s"result = ${result}")
   }
 
   def main(args: Array[String]): Unit = {
@@ -141,6 +156,7 @@ object GraphDSLbuilderTest {
       Wrapper("testMap")(testMap)
       Wrapper("testConstruct")(testConstruct)
       Wrapper("testConcat")(testConcat)
+      Wrapper("testSimpleBuilder")(testSimpleBuilder)
     }
     finally {
       println("terminating the system")
