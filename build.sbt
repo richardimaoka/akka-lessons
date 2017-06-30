@@ -24,6 +24,12 @@ lazy val lesson1 = (project in file(".")).
       "com.typesafe.akka" %% "akka-testkit" % "2.5.3",
       "com.typesafe.akka" %% "akka-typed" % "2.5.3",
       "com.typesafe.akka" %% "akka-http" % "10.0.6",
-      "com.typesafe.akka" %% "akka-contrib" % "2.5.3"
+      "com.typesafe.akka" %% "akka-contrib" % "2.5.3",
+      "org.iq80.leveldb"             % "leveldb"          % "0.7",
+      "org.fusesource.leveldbjni"    % "leveldbjni-all"   % "1.8",
+      "org.scalactic" %% "scalactic" % "3.0.1",
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "commons-io"    % "commons-io" % "2.5"   % "test"
+
     )
   )
