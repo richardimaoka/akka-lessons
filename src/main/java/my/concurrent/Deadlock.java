@@ -1,5 +1,8 @@
 package my.concurrent;
 
+/**
+ * https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html
+ */
 public class Deadlock {
   static class Friend {
     private final String name;

@@ -2,21 +2,32 @@ package my.concurrent;
 
 
 /**
- * Thread interference -> avoided by atomic access
+ * Thread interference -> 1. avoided by atomic access
  * because it is interleaving access to the shared data piece from multiple threads
  *
  * Also it can be avoided by:
  *
- *   sync method/object (synchronized method works like atomic, no interleaving invocation)
- *   or volatile, (Reads/writes are atomic for all variables declared volatile (including long and double variables))
+ *   2. sync method/object (synchronized method works like atomic, no interleaving invocation)
+ *   3. or volatile, (Reads/writes are atomic for all variables declared volatile (including long and double variables))
  *
  * both of which establishes happens-before/after
+ *
+ *
+ *
+ * HOWEVER the below example is NOT actually thread-safe, because
+ * ++ and -- operations are NOT atomic even with volatile int
+ *
+ * https://docs.oracle.com/javase/tutorial/essential/concurrency/atomic.html
+ * Reads and writes are atomic for all variables declared volatile (including long and double variables).
+ *
+ * ++ and -- are not actually single write operation
+
  */
-public class CounterThreadInterference {
+public class ThreadInterferenceVolatile {
 
   public static void main(String[] args) {
     try {
-      CounterThreadUnsafe c = new CounterThreadUnsafe();
+      CounterVolatileUnsafe c = new CounterVolatileUnsafe();
       int loopUpTo = 250000;
 
       Thread t1 = new Thread(new Runnable() {

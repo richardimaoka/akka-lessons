@@ -12,11 +12,11 @@ package my.concurrent;
  *
  * both of which establishes happens-before/after
  */
-public class CounterThreadInterferenceAtomic {
+public class ThreadInterference {
 
   public static void main(String[] args) {
     try {
-      CounterAtomic c = new CounterAtomic();
+      CounterThreadUnsafe c = new CounterThreadUnsafe();
       int loopUpTo = 250000;
 
       Thread t1 = new Thread(new Runnable() {

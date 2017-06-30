@@ -1,7 +1,7 @@
 package my.concurrent;
 
 public class CounterThreadUnsafe {
-  private int c = 0;
+  public int c = 0;
 
   public void increment() {
     c++;
