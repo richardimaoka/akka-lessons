@@ -1,7 +1,9 @@
 package my.concurrent;
 
-public class CounterThreadUnsafe {
+public class CounterThreadUnsafe implements CounterInterface {
   public int c = 0;
+
+  public void setZero() { c = 0; }
 
   public void increment() {
     c++;

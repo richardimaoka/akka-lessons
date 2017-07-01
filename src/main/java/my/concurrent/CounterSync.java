@@ -4,8 +4,10 @@ package my.concurrent;
  *  it automatically establishes a happens-before relationship with any subsequent invocation
  *  of a synchronized method for the same object
  */
-public class CounterSync {
+public class CounterSync implements CounterInterface {
   private int c = 0;
+
+  public void setZero() { c = 0; }
 
   public synchronized void increment() {
     c++;

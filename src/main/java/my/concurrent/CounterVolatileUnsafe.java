@@ -9,8 +9,10 @@ package my.concurrent;
  *
  * ++ and -- are not actually single write operation
  */
-public class CounterVolatileUnsafe {
+public class CounterVolatileUnsafe implements CounterInterface {
   private volatile int c = 0;
+
+  public void setZero() { c = 0; }
 
   public void increment() {
     c++;
