@@ -1,0 +1,6 @@
+TestSink.probe[ByteString]
+
+val sinkPublisher  = ...toMat(Sink.asPublisher(false))(Keep.right).run()
+val sinkSubscriber = TestSubscriber.manualProbe[Int]()
+sinkPublisher.subscribe(sinkSubscriber)
+val sinkSubscription = sinkSubscriber.expectSubscription()
