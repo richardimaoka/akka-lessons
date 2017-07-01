@@ -498,15 +498,28 @@ class InputStreamSinkSpec extends TestKit(ActorSystem("InputStreamSinkSpec")) wi
 
       readN(inputStream, byteString.size * 2) should ===((byteString.size, byteString))
       inputStream.read() should ===(-1)
+      inputStream.read() should ===(-1)
+      inputStream.read() should ===(-1)
+      inputStream.read() should ===(-1)
 
       inputStream.close()
     }
 
+    /**
+     * Cannot upderstand this... where is the behavior from,
+     * and why is it -1 at the end?? ehh maybe due to this?
+     *
+     *   override def read(): Int = {
+          val a = Array[Byte](1)
+          if (read(a, 0, 1) != -1) a(0) & 0xff
+          else -1
+         }
+     */
     "read next byte as an int from InputStream" in {
       println("\nread next byte as an int from InputStream"  + "----------------------------------------------------")
       val bytes = ByteString(0, 100, 200, 255)
       val inputStream = Source.single(bytes).runWith(InputStreamSinkStage.asInputStream())
-      List.fill(5)(inputStream.read()) should ===(List(0, 100, 200, 255, -1))
+      List.fill(6)(inputStream.read()) should ===(List(0, 100, 200, 255, -1, -1))
       inputStream.close()
     }
 
