@@ -164,6 +164,9 @@ class OutputStreamSourceStage(writeTimeout: FiniteDuration) extends GraphStageWi
             sendResponseIfNeed()
         }
 
+      /**
+       * Used in OutputStreamAdapter's sendToStage(), which is called from flush() and close()
+       */
       def wakeUp(msg: AdapterToStageMessage): Future[Unit] = {
         val p = Promise[Unit]()
         this.invoke((msg, p))
@@ -272,7 +275,7 @@ class OutputStreamSourceStage(writeTimeout: FiniteDuration) extends GraphStageWi
 class OutputStreamAdapter(
   dataQueue:        BlockingQueue[ByteString],
   downstreamStatus: AtomicReference[DownstreamStatus],
-  sendToStage:      (AdapterToStageMessage) ⇒ Future[Unit],
+  sendToStage:      (AdapterToStageMessage) ⇒ Future[Unit], //OutputStreamStage's wakeUp()
   writeTimeout:     FiniteDuration) extends OutputStream {
 
   var isActive = true
