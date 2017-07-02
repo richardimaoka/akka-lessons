@@ -1,10 +1,11 @@
-package akka.contrib.d3.my
+package akka.contrib.d3.my.app
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.contrib.d3.my.StartupTasks
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class StartupApp(system: ActorSystem) {
 
@@ -47,7 +48,7 @@ class StartupApp(system: ActorSystem) {
       """.stripMargin
     )
     /**
-     * startupTask holds an ActorRef, and execute() sends an Execute message
+     * startupTask holds an ActorRef inside, and execute() sends an Execute message
      * to the ActorRef in the ask pattern to let its Actor do the work
      */
     startupTask.execute().onComplete { res => println(res) }
