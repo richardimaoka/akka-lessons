@@ -2,19 +2,19 @@ package akka.contrib.d3.my
 
 import akka.NotUsed
 import akka.actor._
-import akka.contrib.d3.{AggregateEntity, AggregateEvent, AggregateRef, AggregateSettings, EventStreamElement, EventStreamSettings, Tag, query}
 import akka.contrib.d3.query.ReadJournalProvider
 import akka.contrib.d3.writeside.{AggregateManagerProvider, LocalAggregateManagerProvider}
+import akka.contrib.d3.{AggregateEntity, AggregateEvent, AggregateRef, AggregateSettings, EventStreamElement, EventStreamSettings, Tag, query}
 import akka.persistence.query.Offset
 import akka.stream.scaladsl.Source
 import akka.util.Reflect
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.util.control.{NoStackTrace, NonFatal}
-import scala.concurrent.ExecutionContext
 import scala.collection.concurrent.{Map => ConcurrentMap}
+import scala.concurrent.ExecutionContext
 import scala.reflect.ClassTag
 import scala.util.Try
+import scala.util.control.{NoStackTrace, NonFatal}
 
 object Domain extends ExtensionId[Domain] with ExtensionIdProvider {
   override def get(system: ActorSystem): Domain = super.get(system)
@@ -75,13 +75,12 @@ class Domain(
   private val aggregateSettings: ConcurrentMap[ClassTag[_], AggregateSettings] = collection.concurrent.TrieMap()
 
   def register[E <: AggregateEntity](
-                                               entityFactory: E#Id ⇒ E,
-                                               name:          Option[String],
-                                               settings:      Option[AggregateSettings]
-                                             )(
-                                               implicit
-                                               ect: ClassTag[E]
-                                             ): Domain = {
+    entityFactory: E#Id ⇒ E,
+    name:          Option[String],
+    settings:      Option[AggregateSettings]
+  )( implicit ect: ClassTag[E] ): Domain = {
+    println(s"Domain: register(entityFactory, name = ${name}, settings)(implicit ect=${ect}) called")
+
     val aggregateName = name.getOrElse(ect.runtimeClass.getName.toLowerCase)
     val aggregateSetting = settings.getOrElse(AggregateSettings(aggregateName, system.settings.config))
 
@@ -93,7 +92,19 @@ class Domain(
             s"It is already for ${rct.runtimeClass.getSimpleName}. Use the name argument to define a unique name."
         ) with NoStackTrace
       case _ ⇒
-        aggregateManagers.putIfAbsent(ect, aggregateManagerProvider.aggregateManagerRef[E](entityFactory, name, aggregateSetting))
+        println(s"Domain: alreadyRegisered = ${alreadyRegistered}")
+
+        /**
+         *  Concurrent Map !
+         *    private val aggregateManagers: ConcurrentMap[ClassTag[_], ActorRef] = collection.concurrent.TrieMap()
+         *    private val aggregateSettings: ConcurrentMap[ClassTag[_], AggregateSettings] = collection.concurrent.TrieMap()
+         *
+         *  putIfAbsent() puts an entry for the key = ect if absent
+         */
+        val aggregaterManagerRef = aggregateManagerProvider.aggregateManagerRef[E](entityFactory, name, aggregateSetting)
+        println(s"Domain: aggregateManagerProvider = ${aggregateManagerProvider}")
+        println(s"Domain: aggregaterManagerRef = ${aggregaterManagerRef}")
+        aggregateManagers.putIfAbsent(ect, aggregaterManagerRef)
         aggregateSettings.putIfAbsent(ect, aggregateSetting)
     }
 
@@ -103,16 +114,15 @@ class Domain(
   final def register[E <: AggregateEntity]( entityFactory: E#Id ⇒ E, name: String)(implicit ect: ClassTag[E]): Domain =
     register[E](entityFactory, Some(name), None)
 
-  def aggregateRef[E <: AggregateEntity](
-                                                   id: E#Id
-                                                 )(
-                                                   implicit
-                                                   ec:  ExecutionContext,
-                                                   ect: ClassTag[E]
-                                                 ): AggregateRef[E] = {
+  def aggregateRef[E <: AggregateEntity](id: E#Id)(implicit ec:  ExecutionContext, ect: ClassTag[E]): AggregateRef[E] = {
     val aggregateManager = aggregateManagers(ect)
     val settings = aggregateSettings(ect)
 
+    /**
+     * AggregateRef has methods similar to Actor (!, tell, ?, ...) and holds aggregateManager inside
+     * aggregateManager instance is only one, for a single Domain/ClassTag[E] pair
+     */
+    println(s"Domain: aggregateRef(${id}) gets a AggregateRef which holds aggregateManager of type ${aggregateManager.getClass} for ect = ${ect}")
     AggregateRef[E](id, aggregateManager, settings.askTimeout)
   }
 

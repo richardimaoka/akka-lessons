@@ -14,15 +14,14 @@ class WriteSideApp(system: ActorSystem) {
   implicit private val ec = system.dispatcher
   implicit private val timeout = akka.util.Timeout(10 seconds)
 
-  private val domain = Domain(system)
-    .register[InvoiceEntity](
+  private val domain = Domain(system).register[InvoiceEntity](
     entityFactory = (id: Invoice.Id) => InvoiceEntity(id),
     name = "invoices"
   )
 
   def run(): Future[Done] = {
     val aggregates: List[AggregateRef[InvoiceEntity]] =
-      List.fill(50) {
+      List.fill(5) {
         Random.nextInt(1000000)
       }.map { id ⇒ domain.aggregateRef[InvoiceEntity](Invoice.Id(s"$id")) }
 
