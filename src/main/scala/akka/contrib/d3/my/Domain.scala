@@ -16,8 +16,7 @@ import scala.collection.concurrent.{Map => ConcurrentMap}
 import scala.reflect.ClassTag
 import scala.util.Try
 
-object Domain extends ExtensionId[Domain]
-  with ExtensionIdProvider {
+object Domain extends ExtensionId[Domain] with ExtensionIdProvider {
   override def get(system: ActorSystem): Domain = super.get(system)
 
   override def lookup(): ExtensionId[_ <: Extension] = Domain
@@ -25,7 +24,7 @@ object Domain extends ExtensionId[Domain]
   override def createExtension(system: ExtendedActorSystem): Domain = {
     val cl = findClassLoader()
     val appConfig = system.settings.config
-    new DomainImpl(system, appConfig, cl)
+    new Domain(system, appConfig, cl)
   }
 
   final class Settings(classLoader: ClassLoader, cfg: Config) {
@@ -63,103 +62,10 @@ object Domain extends ExtensionId[Domain]
   private[d3] def findClassLoader(): ClassLoader = Reflect.findClassLoader()
 }
 
-abstract class Domain
-  extends Extension {
-  final def register[E <: AggregateEntity](
-                                            entityFactory: E#Id ⇒ E
-                                          )(
-                                            implicit
-                                            ect: ClassTag[E]
-                                          ): Domain =
-    register[E](entityFactory, None, None)
-
-  final def register[E <: AggregateEntity](
-                                            entityFactory: E#Id ⇒ E,
-                                            name:          String
-                                          )(
-                                            implicit
-                                            ect: ClassTag[E]
-                                          ): Domain =
-    register[E](entityFactory, Some(name), None)
-
-  final def register[E <: AggregateEntity](
-                                            entityFactory: E#Id ⇒ E,
-                                            settings:      AggregateSettings
-                                          )(
-                                            implicit
-                                            ect: ClassTag[E]
-                                          ): Domain =
-    register[E](entityFactory, None, Some(settings))
-
-  final def register[E <: AggregateEntity](
-                                            entityFactory: E#Id ⇒ E,
-                                            name:          String,
-                                            settings:      AggregateSettings
-                                          )(
-                                            implicit
-                                            ect: ClassTag[E]
-                                          ): Domain =
-    register[E](entityFactory, Some(name), Some(settings))
-
-  def register[E <: AggregateEntity](
-                                      entityFactory: E#Id ⇒ E,
-                                      name:          Option[String],
-                                      settings:      Option[AggregateSettings]
-                                    )(
-                                      implicit
-                                      ect: ClassTag[E]
-                                    ): Domain
-
-  def aggregateRef[E <: AggregateEntity](
-                                          id: E#Id
-                                        )(
-                                          implicit
-                                          ec:  ExecutionContext,
-                                          ect: ClassTag[E]
-                                        ): AggregateRef[E]
-
-  final def eventStream[E <: AggregateEvent](
-                                              tag:        Tag,
-                                              fromOffset: Offset
-                                            ): Source[EventStreamElement[E], NotUsed] =
-    eventStream[E](tag, fromOffset, None, None)
-
-  final def eventStream[E <: AggregateEvent](
-                                              tag:        Tag,
-                                              fromOffset: Offset,
-                                              name:       String
-                                            ): Source[EventStreamElement[E], NotUsed] =
-    eventStream[E](tag, fromOffset, Some(name), None)
-
-  final def eventStream[E <: AggregateEvent](
-                                              tag:        Tag,
-                                              fromOffset: Offset,
-                                              settings:   EventStreamSettings
-                                            ): Source[EventStreamElement[E], NotUsed] =
-    eventStream[E](tag, fromOffset, None, Some(settings))
-
-  final def eventStream[E <: AggregateEvent](
-                                              tag:        Tag,
-                                              fromOffset: Offset,
-                                              name:       String,
-                                              settings:   EventStreamSettings
-                                            ): Source[EventStreamElement[E], NotUsed] =
-    eventStream[E](tag, fromOffset, Some(name), Some(settings))
-
-  def eventStream[E <: AggregateEvent](
-                                        tag:        Tag,
-                                        fromOffset: Offset,
-                                        name:       Option[String],
-                                        settings:   Option[EventStreamSettings]
-                                      ): Source[EventStreamElement[E], NotUsed]
-
-}
-
-class DomainImpl(
-                  val system:        ExtendedActorSystem,
-                  applicationConfig: Config,
-                  classLoader:       ClassLoader
-                ) extends Domain {
+class Domain(
+  val system:        ExtendedActorSystem,
+  applicationConfig: Config,
+  classLoader:       ClassLoader ) extends Extension {
   import Domain._
 
   final val settings: Settings = new Settings(classLoader, applicationConfig)
@@ -168,7 +74,7 @@ class DomainImpl(
   private val aggregateManagers: ConcurrentMap[ClassTag[_], ActorRef] = collection.concurrent.TrieMap()
   private val aggregateSettings: ConcurrentMap[ClassTag[_], AggregateSettings] = collection.concurrent.TrieMap()
 
-  override def register[E <: AggregateEntity](
+  def register[E <: AggregateEntity](
                                                entityFactory: E#Id ⇒ E,
                                                name:          Option[String],
                                                settings:      Option[AggregateSettings]
@@ -194,7 +100,10 @@ class DomainImpl(
     this
   }
 
-  override def aggregateRef[E <: AggregateEntity](
+  final def register[E <: AggregateEntity]( entityFactory: E#Id ⇒ E, name: String)(implicit ect: ClassTag[E]): Domain =
+    register[E](entityFactory, Some(name), None)
+
+  def aggregateRef[E <: AggregateEntity](
                                                    id: E#Id
                                                  )(
                                                    implicit
@@ -207,7 +116,7 @@ class DomainImpl(
     AggregateRef[E](id, aggregateManager, settings.askTimeout)
   }
 
-  override def eventStream[E <: AggregateEvent](
+  def eventStream[E <: AggregateEvent](
                                                  tag:        Tag,
                                                  fromOffset: Offset,
                                                  name:       Option[String],
