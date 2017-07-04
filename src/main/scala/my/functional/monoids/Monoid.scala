@@ -10,6 +10,11 @@ trait Monoid[A] {
 }
 
 object Monoid {
+  /***************************************************************************
+   *
+   * List of Monoid instances for String, Int, List, Option, ..
+   *
+   ***************************************************************************/
   val stringMonoid = new Monoid[String] {
     def op(a1: String, a2: String) = a1 + a2
     val zero = ""
@@ -40,6 +45,11 @@ object Monoid {
     val zero = true
   }
 
+  /***************************************************************************
+   *
+   * Non-commutative Monid example, Option
+   *
+   ***************************************************************************/
   // Notice that we have a choice in how we implement `op`.
   // We can compose the options in either order. Both of those implementations
   // satisfy the monoid laws, but they are not equivalent.
@@ -62,25 +72,36 @@ object Monoid {
     val zero = None
   }
 
+  /***************************************************************************
+   *
+   * Special monoid, endoMonid which is also a non-commutative example,
+   * and a Monoid on a function (A => A)
+   *
+   ***************************************************************************/
   // There is a choice of implementation here as well.
   // Do we implement it as `f compose g` or `f andThen g`? We have to pick one.
   def endoMonoid[A]: Monoid[A => A] = new Monoid[A => A] {
-    def op(f: A => A, g: A => A) = f compose g
+    def op(f: A => A, g: A => A): A => A = f compose g
     val zero = (a: A) => a
   }
 
   // (f compose g)(x) = f(g(x))
   def endoMonoidLeftComposeRight[A]: Monoid[A => A] = new Monoid[A => A] {
-    def op(f: A=>A, g: A=>A) = f compose g
+    def op(f: A=>A, g: A=>A): A => A = f compose g
     val zero = (a: A) => a
   }
 
   // (f andThen g)(x) = g(f(x))
   def endoMonoidLeftAndThenRight[A]: Monoid[A => A] = new Monoid[A => A] {
-    def op(f: A=>A, g: A=>A) = f andThen  g
+    def op(f: A=>A, g: A=>A): A => A = f andThen  g
     val zero = (a: A) => a
   }
 
+  /***************************************************************************
+   *
+   * Below is quizes for foldMap, foldLeft and foldRight
+   *
+   ***************************************************************************/
   // Notice that this function does not require the use of `map` at all.
   // All we need is `foldLeft`.
   /**
@@ -102,7 +123,6 @@ object Monoid {
    *    X: whose initial value is the zero element of B
    *    Y: the list is already given as List[A]
    *    Z: and each element: A of List[A] is converted by f, and succeedingly foldLeft'ed
-   *
    */
   def foldMap[A, B](as: List[A], m: Monoid[B])(f: A => B): B =
     as.foldLeft(m.zero)((b, a) => m.op(b, f(a)))
@@ -114,10 +134,6 @@ object Monoid {
    */
   def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B): B =
     foldMap(as, endoMonoid[B])(f.curried)(z)
-  /**
-   *
-   */
-
 
   // Folding to the left is the same except we flip the arguments to
   // the function `f` to put the `B` on the correct side.
@@ -136,6 +152,32 @@ object Monoid {
 }
 
 object MonoidMain {
+
+  def decomposeFoldRight() {
+    //foldLeft[Int, Int](as: List[Int])(z: Int)( f(Int, Int) => Int)
+    val a = Monoid.foldRight(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))(20)( (x,y) => x + y)
+    println(s"Monoid.foldLeft(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))(20)( (x,y) => x + y) = ${a}")
+
+    val as1 = List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    val z1  = 20
+    val f1  = (x: Int, y: Int) => x + y
+    println(s"Monoid.foldLeft(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))(20)( (x,y) => x + y) = ${Monoid.foldRight(as1)(z1)(f1)}")
+
+    val endo = Monoid.endoMonoid[Int]
+    println(s"Monoid.foldMap(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), Monoid.endoMonoid[Int])(20)(((x,y)=>x+y).curried(20))")
+    println(s"Monoid.foldMap(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), Monoid.endoMonoid[Int])(20)( x=>x+20 ) = ${Monoid.foldMap(as1, endo)(f1.curried)(20)}")
+
+    val curry = f1.curried(20)
+    println( s"curry = ${curry(10)}")
+
+    val spicycurry = (f1.curried)(20)
+    println( s"spicycurry = ${spicycurry(40)}")
+
+    //foldLeft[Int, String](as: List[Int])(z: String)( f(Int, String) => Int)
+    val b = Monoid.foldRight(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))("Equation: ")( (x,y) => x + " + " + y)
+    println(s"Monoid.foldLeft(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))(''Equation: '')( (x,y) => x + y) = ${b}")
+
+  }
 
   def testFoldMap(): Unit ={
     val a: Int = Monoid.foldMap(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), Monoid.intMonoid)(x => x*2)
@@ -187,6 +229,27 @@ object MonoidMain {
     println(s"Monoid.foldLeft(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))(''Equation: '')( (x,y) => x + y) = ${b}")
   }
 
+  def testDual(): Unit = {
+    val a = Monoid.dual(Monoid.intMonoid).op(1, 2);
+    println("Monoid.dual(Monoid.intMonoid).op(1, 2) = " + a)
+
+    val m = Monoid.dual(Monoid.stringMonoid)
+    val x = m.op("aaa", "bbb")
+    println("Dual Monoid created by Monoid.stringMonid has op(aaa, bbb) = " + x)
+  }
+
+  def testEndoMonoid(): Unit ={
+    val a = Monoid.endoMonoid[Int]
+    val b = a.op(x => x*x, y => y+2)
+
+    println("Monoid.endoMonoid[Int].op(x => x*x, y => y+2)(8) = (8+2)*(8+2) = " + b(8) + " // f compose g = f(g())")
+
+    val c = Monoid.endoMonoidLeftAndThenRight[Int]
+    val d = c.op(x => x*x, y => y+2)
+
+    println("Monoid.endoMonoid[Int].op(x => x*x, y => y+2)(8) = (8*8)+2     = " + d(8) + "  // f andThen g = g(f())")
+  }
+
   def main(args: Array[String]): Unit = {
     println( s"Some(1) orElse Some(2) = ${Some(1) orElse Some(2)}" )
     println( s"None orElse Some(2)    = ${None orElse Some(2)}" )
@@ -200,5 +263,10 @@ object MonoidMain {
     Wrapper("testFoldMap")(testFoldMap)
     Wrapper("testFoldLeft")(testFoldLeft)
     Wrapper("testFoldRight")(testFoldRight)
+
+    Wrapper("testDual")(testDual)
+    Wrapper("testEndoMonoid")(testEndoMonoid)
+
+    Wrapper("decomposeFoldRight")(decomposeFoldRight)
   }
 }
