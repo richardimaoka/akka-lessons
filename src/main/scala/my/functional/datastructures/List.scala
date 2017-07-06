@@ -1,7 +1,7 @@
 package my.functional.datastructures
 
 import my.functional.datastructures.List.sum
-import my.wrapper.Wrapper
+import my.wrapper.{Wrap, Wrapper}
 
 sealed trait List[+A] {
   def flagPrintConstructor: Boolean = List.flagPrintConstructor
@@ -607,6 +607,6 @@ object ListTest {
 //    Wrapper("concatTest")(concatTest)
 //    Wrapper("mapTest")(mapTest)
 //    Wrapper("flatMapTest")(flatMapTest)
-//    Wrapper("filterTest")(filterTest)
+    Wrap("filterTest")(filterTest())
   }
 }
