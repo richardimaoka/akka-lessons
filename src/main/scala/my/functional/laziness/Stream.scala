@@ -5,10 +5,38 @@ import my.functional.datastructures.List.{flagPrintConstructor, flagPrintFold}
 import my.wrapper.Wrap
 trait Stream[+A] {
 
-  def foldRight[B](z: => B)(f: (A, => B) => B): B = // The arrow `=>` in front of the argument type `B` means that the function `f` takes its second argument by name and may choose not to evaluate it.
+  /**
+   * The arrow `=>` in front of the argument type `B` means that
+   * the function `f` takes its second argument by name and may choose not to evaluate it.
+   *
+   * In List it was
+   *   List  : def foldRight[B](z: B)(f: (A,B) => B): B
+   * compared to
+   *   Stream: def foldRight[B](z: => B)(f: (A, => B) => B): B
+   */
+  def foldRight[B](z: => B)(f: (A, => B) => B): B =
     this match {
-      case Cons(h,t) => f(h(), t().foldRight(z)(f)) // If `f` doesn't evaluate its second argument, the recursion never occurs.
-      case _ => z
+      /**
+       * If `f` doesn't evaluate its second argument, the recursion never occurs
+       * that's a benefit using Stream ... ?
+       *
+       * See forAll() about how this is relevant
+       */
+      case Cons(headElementLazy, tailStreamLazy) => {
+        if(Stream.flagPrintRecurse)
+          println(s"foldRight called for h = ${headElementLazy()} t = ${tailStreamLazy()} z = ${z})")
+
+        f(
+          headElementLazy(),               // this is in type A of course
+          tailStreamLazy().foldRight(z)(f) // this is in type B, passed as => B
+        )
+      }
+      case _ => {
+        if(Stream.flagPrintRecurse)
+          println(s"foldRight called on ${this} with z = ${z})")
+
+        z
+      }
     }
 
   def exists(p: A => Boolean): Boolean =
@@ -20,7 +48,17 @@ trait Stream[+A] {
     case Cons(h, t) => if (f(h())) Some(h()) else t().find(f)
   }
 
-  def forAll(p: A => Boolean): Boolean = ???
+  /**
+   * Since `&&` is non-strict in its second argument,
+   * this terminates the traversal as soon as a nonmatching element is found.
+   *
+   * See the comments of foldRight ... interestingly even though it uses fold*Right*
+   * passing a function which doesn't (conditionally) evaluate the second arg (i.e. (a,b) => f(a) && b)
+   * foldRight can terminate early
+   */
+  def forAll(f: A => Boolean): Boolean = {
+    foldRight(true)((a,b) => f(a) && b)
+  }
 
   def headOption: Option[A] = ???
 
@@ -105,7 +143,7 @@ trait Stream[+A] {
   def take(n: Int): Stream[A] = this match {
     case Cons(h, t) if n > 1 => {
       if(Stream.flagPrintRecurse)
-        println(s"take is called for Cons(${h()}, ${t()}) where n = ${n} => cons(${h()}, ${t}.take(${n}-1))")
+        println(s"take is called for Cons(${h()}, ${t()}) where n = ${n} => cons(${h()}, ${t()}.take(${n}-1))")
       cons(h(), t().take(n - 1))
     }
     case Cons(h, _) if n == 1 => {
@@ -141,7 +179,8 @@ trait Stream[+A] {
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A] {
-  override def toString = "Stream(...)"
+  override def toString =
+    "Stream(" + this.toListFast.foldLeft("")((x, y) => s"${x}${y},") + ")"
 }
 
 object Stream {
@@ -259,13 +298,32 @@ object StreamTest {
 
   def takeTest(): Unit = {
     val a = Stream(1,2,3,4,5,6,7,8,9,10)
+    println(a.toString)
     printRecurseCalls{
       val atake1 = a.take(1)
+      println("printing out a.take(1).toList")
       println(atake1.toList)
       println()
 
       val atake6 = a.take(6)
+      println("printing out a.take(6).toList")
       println(atake6.toList)
+    }
+  }
+
+  def foldRightTest(): Unit = {
+    val s = Stream(1,2,3,4,5,6)
+    println(s.foldRight("")((x,y)=>x + ", " + y))
+
+    val l = List(1,2,3,4,5,6)
+    println(s.foldRight("")((x,_)=>x + ", " ))
+    println(l.foldRight("")((x,_)=>x + ", " ))
+  }
+
+  def forAlTest(): Unit = {
+    val s = Stream(1,2,3,4,5,6)
+    printRecurseCalls{
+      println(s.forAll(_ < 3))
     }
   }
 
@@ -274,5 +332,7 @@ object StreamTest {
     Wrap("preRequisits")(preRequisits)
     Wrap("toListTest")(toListTest())
     Wrap("takeTest")(takeTest)
+    Wrap("foldRightTest")(foldRightTest)
+    Wrap("forAlTest")(forAlTest)
   }
 }
