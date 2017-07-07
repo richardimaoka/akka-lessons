@@ -1,5 +1,14 @@
 package my.functional.laziness
 
+/**
+ * Rewrite this whole file, once finished, by using different representation of `Cons` data constructor
+ *
+ * Instead of this:
+ *   case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
+ * Use no-paren ver.:
+ *   case class Cons[+A](h: => A, t: => Stream[A]) extends Stream[A]
+ */
+
 import Stream._
 import my.functional.datastructures.List.{flagPrintConstructor, flagPrintFold}
 import my.wrapper.Wrap
@@ -172,10 +181,19 @@ trait Stream[+A] {
   It's a common Scala style to write method calls without `.` notation, as in `t() takeWhile f`.
   */
   def takeWhile(f: A => Boolean): Stream[A] = this match {
-    case Cons(h,t) if f(h()) => cons(h(), t() takeWhile f)
+    case Cons(headElementLazy,tailStreamLazy) if f(headElementLazy()) =>
+      cons(headElementLazy(), tailStreamLazy() takeWhile f)
     case _ => empty
   }
 
+  def takeWhile2(f: A => Boolean): Stream[A] =
+  //foldRight[B](z: => B)(f: (A, => B) => B): B =
+    foldRight(Empty: Stream[A]) {
+      //(f: (A, => B) => B)
+      (headElement /*already evaluated*/, tailStreamLazy) =>
+        if (f(headElement)) cons(headElement, tailStreamLazy)
+        else Empty
+    }
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A] {
