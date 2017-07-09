@@ -10,6 +10,21 @@ trait Monoid[A] {
 }
 
 object Monoid {
+  private var flagPrintRecurse: Boolean = false
+  private var flagPrintConstructor: Boolean = false
+
+  def printRecurse(f: => Unit): Unit = {
+    flagPrintRecurse = true
+    f
+    flagPrintRecurse = false
+  }
+
+  def printConstractor(f: => Unit): Unit = {
+    flagPrintConstructor = true
+    f
+    flagPrintConstructor = false
+  }
+
   /***************************************************************************
    *
    * List of Monoid instances for String, Int, List, Option, ..
@@ -149,9 +164,155 @@ object Monoid {
     def op(x: A, y: A): A = m.op(y, x)
     val zero = m.zero
   }
+
+  def foldMapV[A, B](as: IndexedSeq[A], m: Monoid[B])(f: A => B): B =
+    if (as.length == 0){
+      if(flagPrintRecurse)
+        println(s"foldMapV called for zero length seq, resulting in ${m.zero}")
+      m.zero
+    }
+    else if (as.length == 1){
+      val onlyElem = as(0)
+      if(flagPrintRecurse)
+        println(s"foldMapV called for only elem = ${onlyElem}")
+      f(onlyElem)
+    }
+    else {
+      val (l, r) = as.splitAt(as.length / 2)
+      if(flagPrintRecurse)
+        println(s"foldMapV called for l=${l} r=${r}")
+      m.op(foldMapV(l, m)(f), foldMapV(r, m)(f))
+    }
+
+  sealed trait WC
+  case class Stub(chars: String) extends WC
+  case class Part(lStub: String, words: Int, rStub: String) extends WC
+
+  val wcMonoid: Monoid[WC] = new Monoid[WC] {
+    // The empty result, where we haven't seen any characters yet.
+    val zero = Stub("")
+
+    def op(a: WC, b: WC) = (a, b) match {
+      //Stub("ard-i") + Stub("maok") = Stub("ard-imaok")
+      case (Stub(c), Stub(d)) => Stub(c + d)
+      //Stub("ard-i") + Part("maoka", 2, "gr") = Part("ard-imaok", 2, "gr")
+      case (Stub(c), Part(l, w, r)) => Part(c + l, w, r)
+      //Part("thor", 2, "richard-i") + Stub("maok") = Part("thor", 2, "richard-imaok")
+      case (Part(l, w, r), Stub(c)) => Part(l, w, r + c)
+      //Part("thor", 2, "richard-i") + Part("maoka", 3, "gr") = Part("thor", 6, "gr")
+      case (Part(l1, w1, r1), Part(l2, w2, r2)) =>
+        Part(l1, w1 + (if ((r1 + l2).isEmpty) 0 else 1) + w2, r2)
+    }
+  }
+
+  def count(s: String): Int = {
+    // A single character's count. Whitespace does not count,
+    // and non-whitespace starts a new Stub.
+    def wc(c: Char): WC =
+      if (c.isWhitespace)
+        Part("", 0, "")
+      else
+        Stub(c.toString)
+    // `unstub(s)` is 0 if `s` is empty, otherwise 1.
+    def unstub(s: String) = s.length min 1
+    foldMapV(s.toIndexedSeq, wcMonoid)(wc) match {
+      case Stub(s) => unstub(s)
+      case Part(l, w, r) => unstub(l) + w + unstub(r)
+    }
+  }
+}
+
+trait Foldable[F[_]] {
+  import Monoid._
+
+  def foldRight[A,B](as: F[A])(z: B)(f: (A, B) => B): B =
+    foldMap(as)(f.curried)(endoMonoid[B])(z)
+
+  def foldLeft[A,B](as: F[A])(z: B)(f: (B, A) => B): B =
+    foldMap(as)(a => (b: B) => f(b, a))(dual(endoMonoid[B]))(z)
+
+  def foldMap[A, B](as: F[A])(f: A => B)(mb: Monoid[B]): B =
+    foldRight(as)(mb.zero)((a, b) => mb.op(f(a), b))
+
+  def concatenate[A](as: F[A])(m: Monoid[A]): A =
+    foldLeft(as)(m.zero)(m.op)
+
+  def toList[A](as: F[A]): List[A] =
+    foldRight(as)(List[A]())(_ :: _)
+}
+
+object NonWorkingFoldable extends Foldable[List]
+
+object ListFoldable extends Foldable[List] {
+  override def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B) =
+    as.foldRight(z)(f)
+  override def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B) =
+    as.foldLeft(z)(f)
+  override def foldMap[A, B](as: List[A])(f: A => B)(mb: Monoid[B]): B =
+    foldLeft(as)(mb.zero)((b, a) => mb.op(b, f(a)))
+  override def toList[A](as: List[A]): List[A] = as
+}
+
+object IndexedSeqFoldable extends Foldable[IndexedSeq] {
+  import Monoid._
+  override def foldRight[A, B](as: IndexedSeq[A])(z: B)(f: (A, B) => B) =
+    as.foldRight(z)(f)
+  override def foldLeft[A, B](as: IndexedSeq[A])(z: B)(f: (B, A) => B) =
+    as.foldLeft(z)(f)
+  override def foldMap[A, B](as: IndexedSeq[A])(f: A => B)(mb: Monoid[B]): B =
+    foldMapV(as, mb)(f)
+}
+
+object StreamFoldable extends Foldable[Stream] {
+  override def foldRight[A, B](as: Stream[A])(z: B)(f: (A, B) => B) =
+    as.foldRight(z)(f)
+  override def foldLeft[A, B](as: Stream[A])(z: B)(f: (B, A) => B) =
+    as.foldLeft(z)(f)
+}
+
+sealed trait Tree[+A]
+case class Leaf[A](value: A) extends Tree[A]
+case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
+
+// Notice that in `TreeFoldable.foldMap`, we don't actually use the `zero`
+// from the `Monoid`. This is because there is no empty tree.
+// This suggests that there might be a class of types that are foldable
+// with something "smaller" than a monoid, consisting only of an
+// associative `op`. That kind of object (a monoid without a `zero`) is
+// called a semigroup. `Tree` itself is not a monoid, but it is a semigroup.
+object TreeFoldable extends Foldable[Tree] {
+  override def foldMap[A, B](as: Tree[A])(f: A => B)(mb: Monoid[B]): B = as match {
+    case Leaf(a) => f(a)
+    case Branch(l, r) => mb.op(foldMap(l)(f)(mb), foldMap(r)(f)(mb))
+  }
+  override def foldLeft[A, B](as: Tree[A])(z: B)(f: (B, A) => B): B = as match {
+    case Leaf(a) => f(z, a)
+    case Branch(l, r) => foldLeft(r)(foldLeft(l)(z)(f))(f)
+  }
+  override def foldRight[A, B](as: Tree[A])(z: B)(f: (A, B) => B): B = as match {
+    case Leaf(a) => f(a, z)
+    case Branch(l, r) => foldRight(l)(foldRight(r)(z)(f))(f)
+  }
+}
+
+object OptionFoldable extends Foldable[Option] {
+  override def foldMap[A, B](as: Option[A])(f: A => B)(mb: Monoid[B]): B =
+    as match {
+      case None => mb.zero
+      case Some(a) => f(a)
+    }
+  override def foldLeft[A, B](as: Option[A])(z: B)(f: (B, A) => B) = as match {
+    case None => z
+    case Some(a) => f(z, a)
+  }
+  override def foldRight[A, B](as: Option[A])(z: B)(f: (A, B) => B) = as match {
+    case None => z
+    case Some(a) => f(a, z)
+  }
 }
 
 object MonoidMain {
+  import Monoid._
 
   def decomposeFoldRight() {
     //foldLeft[Int, Int](as: List[Int])(z: Int)( f(Int, Int) => Int)
@@ -250,6 +411,46 @@ object MonoidMain {
     println("Monoid.endoMonoid[Int].op(x => x*x, y => y+2)(8) = (8*8)+2     = " + d(8) + "  // f andThen g = g(f())")
   }
 
+  def testStringFoldMapV(): Unit = {
+    case class MyStringHolder(str: String)
+    val list: Array[MyStringHolder] = Array(
+      MyStringHolder("a"),
+      MyStringHolder("b"),
+      MyStringHolder("c"),
+      MyStringHolder("d"),
+      MyStringHolder("e"),
+      MyStringHolder("f"),
+      MyStringHolder("g")
+    )
+
+    printRecurse{
+      println(foldMapV(list, stringMonoid)(holder => holder.str))
+    }
+  }
+
+  def testCount(): Unit = {
+    def wc(c: Char): WC =
+      if (c.isWhitespace)
+        Part("", 0, "")
+      else
+        Stub(c.toString)
+
+    println( foldMapV("aaa bbb ccc".toIndexedSeq, wcMonoid)(wc) )
+    println( foldMapV("aaa bbb ccc ddd".toIndexedSeq, wcMonoid)(wc) )
+    println( foldMapV("aaa bbb ccc d dd ".toIndexedSeq, wcMonoid)(wc) )
+    println( foldMapV("aaa bbb ccc  sd   d".toIndexedSeq, wcMonoid)(wc) )
+    println( foldMapV("aaa bbb ccc richard-imaoka".toIndexedSeq, wcMonoid)(wc) )
+  }
+
+
+  def testNonWorkingFoldable(): Unit = {
+    val list = List(1,2,3,4)
+    /**
+     * This will cause java.lang.StackOverflowError
+     */
+    println(NonWorkingFoldable.foldLeft(list)(0)(_ + _))
+  }
+
   def main(args: Array[String]): Unit = {
     println( s"Some(1) orElse Some(2) = ${Some(1) orElse Some(2)}" )
     println( s"None orElse Some(2)    = ${None orElse Some(2)}" )
@@ -268,5 +469,9 @@ object MonoidMain {
     Wrapper("testEndoMonoid")(testEndoMonoid)
 
     Wrapper("decomposeFoldRight")(decomposeFoldRight)
+    Wrapper("testStringFoldMapV")(testStringFoldMapV)
+
+    Wrapper("testCount")(testCount)
+    //Wrapper("testNonWorkingFoldable")(testNonWorkingFoldable)
   }
 }
