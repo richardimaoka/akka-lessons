@@ -1,4 +1,4 @@
-package my.cats
+package my.cats.examples
 
 import cats.kernel.Semigroup
 import my.wrapper.Wrap

@@ -1,6 +1,5 @@
-package my.cats
+package my.cats.examples
 
-import cats.Functor
 import my.wrapper.Wrap
 
 /**

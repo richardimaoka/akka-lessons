@@ -1,4 +1,4 @@
-package my.cats
+package my.cats.examples
 
 import my.wrapper.Wrap
 
