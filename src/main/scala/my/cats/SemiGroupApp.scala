@@ -3,7 +3,18 @@ package my.cats
 import cats.kernel.Semigroup
 import my.wrapper.Wrap
 
-
+/**
+ * https://www.scala-exercises.org/cats/semigroup
+ * A semigroup for some given type A has a single operation (which we will call combine),
+ * which takes two values of type A, and returns a value of type A.
+ * This operation must be guaranteed to be associative.
+ *
+ *   ((a combine b) combine c)
+ *
+ * is equivalent to
+ *
+ *   (a combine (b combine c))
+ */
 object SemiGroupApp {
   import cats.implicits._
 
