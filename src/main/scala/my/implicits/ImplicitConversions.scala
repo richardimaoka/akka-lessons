@@ -37,27 +37,30 @@ object ImplicitConversions {
 
     /**
      * The answer shows why the above expectation is dangerous
+     * ... actually it doesn't ..
      */
     answer()
   }
 
   def answer(): Unit = {
-
-    /**
-     * So here
-     * @param opt
-     */
     implicit def autoSome[T](any:T) = Some(any)
 
-    class OptDouble(opt: Option[Double]) {
-      implicit def *(x: Double) = Some((opt getOrElse 0.0) * x)
-      implicit def ^(x: Double) = Some(Math.pow(opt getOrElse 1.0, x))
+    implicit class OptDouble(opt: Option[Double]) {
+      def *(x: Double) = Some((opt getOrElse 0.0) * x)
+      def ^(x: Double) = Some(Math.pow(opt getOrElse 1.0, x))
     }
 
     val q: Double = 2
-    val z = q^4.5
 
-    println(z)
+    /**
+     * Hmmm!!!??? This doesn't even compile... I don't know
+     * what the person who gave this answer wanted to do.
+     *
+     * :(
+     */
+    //val z = q^4.5
+
+    //println(z)
   }
 
 }
