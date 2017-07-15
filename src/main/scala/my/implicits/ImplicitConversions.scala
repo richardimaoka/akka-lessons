@@ -3,6 +3,14 @@ package my.implicits
 /**
  * Scala Option implicit conversion - Bad practice or missing feature?
  * https://stackoverflow.com/questions/27590756/scala-option-implicit-conversion-bad-practice-or-missing-feature
+ *
+ * So seems like the danger is realized (especially? or often?)
+ * when converting into a widely-used existing classes.
+ * https://dwango.github.io/scala_text/implicit.html
+ *   本来Booleanしか渡せないはずのif式にIntを渡すことができています。
+ *   ただし、この使い方はあまり良いものではありません。
+ *   上の例をみればわかる通り、implicit conversionを定義することで、コンパイラにより、
+ *   本来はif式の条件式にはBoolean型の式しか渡せないようにチェックしているのを通りぬけることができてしまうからです
  */
 object ImplicitConversions {
 
