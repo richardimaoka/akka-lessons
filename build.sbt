@@ -32,6 +32,7 @@ lazy val lesson1 = (project in file(".")).
       "org.fusesource.leveldbjni"    % "leveldbjni-all"   % "1.8",
       "org.scalactic" %% "scalactic" % "3.0.1",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
       "commons-io"    % "commons-io" % "2.5"   % "test",
 
       "io.pjan" %% "akka-d3" % "0.4.3",
@@ -40,6 +41,5 @@ lazy val lesson1 = (project in file(".")).
       "org.slf4j" % "slf4j-simple" % "1.7.7",
 
       "org.typelevel" %% "cats" % "0.9.0"
-
     )
   )
