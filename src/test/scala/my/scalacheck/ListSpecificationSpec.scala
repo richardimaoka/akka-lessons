@@ -16,10 +16,22 @@ object ListSpecificationSpec extends Properties("List") {
     l1.size + l2.size == (l1 ::: l2).size
   }}
 
-  property("reverse") =  forAll { l: List[String] => {
+  property("reverse") = forAll { l: List[String] => {
     if(isDebugPrint)
       println(s"list, l: ${l}")
 
     l.reverse.reverse == l
   }}
+
+  property("makeList") = forAll {
+    n: Int => {
+      import org.scalacheck.Prop.BooleanOperators
+
+      if(isDebugPrint)
+        println(s"makeList: n = ${n}")
+
+      // ===> operator is imported by org.scalacheck.Prop.BooleanOperators
+      (n >= 0 && n < 10000) ==> (List.fill(n)("").length == n)
+    }
+  }
 }
