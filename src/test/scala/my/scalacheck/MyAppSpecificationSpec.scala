@@ -2,7 +2,8 @@ package my.scalacheck
 
 import org.scalacheck.Properties
 
-object MyAppSpecification extends Properties("MyApp") {
+object MyAppSpecificationSpec extends Properties("MyApp") {
+  include(ArbitrarySpec)
   include(CheckProps)
   include(CombineProps)
   include(ComplexProps)
