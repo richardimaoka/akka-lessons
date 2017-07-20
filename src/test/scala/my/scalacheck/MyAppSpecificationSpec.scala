@@ -3,12 +3,12 @@ package my.scalacheck
 import org.scalacheck.Properties
 
 object MyAppSpecificationSpec extends Properties("MyApp") {
-//  include(ArbitrarySpec)
+  include(ArbitrarySpec)
 //  include(CheckProps)
 //  include(CombineProps)
 //  include(ComplexProps)
-//  include(GeneratorSpec)
-  include(GeneratedData)
+  include(GeneratorSpec)
+//  include(GeneratedData)
 //  include(IntSpecificationSpec)
 //  include(ListSpecificationSpec)
 //  include(StringSpecificationSpec)
