@@ -78,6 +78,7 @@ object ArbitrarySpec extends Properties("ArbitrarySpec") {
   /**
    * As long as the implicit arbTree function is in scope, you can now write properties like this:
    */
-  val propMergeTree = forAll( (t1: Tree[Int], t2: Tree[Int]) =>
+  val propMergeTree = forAll { (t1: Tree[Int], t2: Tree[Int]) =>
     t1.size + t2.size == t1.merge(t2).size
+  }
 }
