@@ -61,7 +61,7 @@ object GeneratedData extends Properties("Generated") {
   }
   /**
    * Then you see something like below in the output:
-   * 
+   *
    * [info] > Collected test data: 
    * [info] 16% 6
    * [info] 14% 2
