@@ -40,6 +40,8 @@ lazy val lesson1 = (project in file(".")).
       "io.pjan" %% "akka-d3-readside-cassandra" % "0.4.3",
       "org.slf4j" % "slf4j-simple" % "1.7.7",
 
+      "org.zalando" %% "grafter" % "1.7.0",
+
       "org.typelevel" %% "cats" % "0.9.0"
     )
   )
