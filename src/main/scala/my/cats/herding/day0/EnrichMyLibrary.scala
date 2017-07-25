@@ -19,7 +19,7 @@ object EnrichMyLibrary {
 //      @op("|+|") def mappend(a: A, b: A): A
 //      def mzero: A
 //    }
-
+//
 //    object Monoid {
 //      // "ops" gets generated
 //      //val syntax = ops //compile error, somehow not generated
@@ -34,9 +34,9 @@ object EnrichMyLibrary {
 //        def mzero: String = ""
 //      }
 //    }
-
-    //import Monoid.syntax._
-    //println(3 |+| 4)
+//
+//    import Monoid.syntax._
+//    println(3 |+| 4)
   }
 
   def catsTest(): Unit = {

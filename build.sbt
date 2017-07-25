@@ -34,8 +34,8 @@ lazy val lesson1 = (project in file(".")).
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
       "commons-io"    % "commons-io" % "2.5"   % "test",
-      "org.specs2" %% "specs2-core" % "3.6" % "test",
-      "org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
+      //"org.specs2" %% "specs2-core" % "3.6" % "test",
+      //"org.specs2" %% "specs2-scalacheck" % "3.6" % "test",
 
       "io.pjan" %% "akka-d3" % "0.4.3",
       "io.pjan" %% "akka-d3-query-inmemory" % "0.4.3",
@@ -45,7 +45,7 @@ lazy val lesson1 = (project in file(".")).
       "org.zalando" %% "grafter" % "1.7.0",
 
       "com.github.mpilquist" %% "simulacrum" % "0.10.0",
-      "org.scalamacros" %% "resetallattrs" % "1.0.0-M1"
+      "org.scalamacros" %% "resetallattrs" % "1.0.0",
 
       "org.typelevel" %% "cats" % "0.9.0"
     )
