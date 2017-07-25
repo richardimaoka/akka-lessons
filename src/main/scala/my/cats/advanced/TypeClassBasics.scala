@@ -146,23 +146,11 @@ object TypeClassBasics {
         p.format(input)
     }
 
-    /**
-     * First we define an implicit **class** containing our extension methods:
-     */
-    object PrintableSyntax {
-      implicit class PrintOps[A](value: A) {
-        def format(implicit p: Printable[A]): String =
-          p.format(value)
-        def print(implicit p: Printable[A]): Unit =
-          println(p.format(value))
-      }
-    }
-
     final case class Cat(
-      name: String,
-      age: Int,
-      color: String
-    )
+                          name: String,
+                          age: Int,
+                          color: String
+                        )
     object Cat {
       import Printable._
       implicit val catPrintable = new Printable[Cat] {
@@ -175,6 +163,21 @@ object TypeClassBasics {
       }
     }
 
+    /**
+     * First we define an implicit **class** containing our extension methods:
+     */
+    object PrintableSyntax {
+      implicit class PrintOps[A](value: A) {
+        def format(implicit p: Printable[A]): String =
+          p.format(value)
+        def print(implicit p: Printable[A]): Unit =
+          println(p.format(value))
+      }
+    }
+
+    /**
+     * See the .print method - enrich my library pattern ??
+     */
     import PrintableSyntax._
     Cat("Garfield", 35, "ginger and black").print
     // Garfield is a 35 year-old ginger and black cat.
