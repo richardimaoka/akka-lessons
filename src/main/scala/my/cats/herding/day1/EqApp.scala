@@ -35,7 +35,7 @@ object EqApp {
      * [warn]       ^
      * [warn] one warning found
      */
-    1 == "foo"
+    //1 == "foo"
 
     /**
      * Cats provides =!= instead of Scala std's !=
