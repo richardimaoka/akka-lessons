@@ -197,6 +197,59 @@ object Polymorphism {
     println(sum(List(1, 2, 3, 4)))
   }
 
+  def multiMonoidTest(): Unit ={
+    trait Monoid[A] {
+      def mappend(a1: A, a2: A): A
+      def mzero: A
+    }
+
+    implicit val IntMonoid: Monoid[Int] = new Monoid[Int] {
+      def mappend(a: Int, b: Int): Int = a + b
+      def mzero: Int = 0
+    }
+
+    /**
+     * Interesting, this also accepts explicitly passing a parameter, same as:
+     *  def sum[A](xs: List[A])(implicit m: Monoid[A]): A
+     */
+    def sum[A: Monoid](xs: List[A]): A = {
+      val m = implicitly[Monoid[A]]
+      xs.foldLeft(m.mzero)(m.mappend)
+    }
+    /**
+     *  Aaaahh, according to http://eed3si9n.com/herding-cats/ja/sum-function.html
+     *  defining the function like this will actually add the implicit parameter
+     *
+     *  // on console
+     *  scala> def sum[A: Monoid](xs: List[A]): A = {
+     *    val m = implicitly[Monoid[A]]
+     *    xs.foldLeft(m.mzero)(m.mappend)
+     *  }
+     *  sum: [A](xs: List[A])(implicit evidence$1: Monoid[A])A
+     *
+     *
+     *  So, this:
+     *    def sum[A: Monoid](xs: List[A]): A = {
+     *      val m = implicitly[Monoid[A]]
+     *      xs.foldLeft(m.mzero)(m.mappend)
+     *    }
+     *
+     *  and this:
+     *    def sum[A](xs: List[A])(implicit m: Monoid[A]): A = xs.foldLeft(m.mzero)(m.mappend)
+     *
+     *  are equivalent.
+     */
+
+    println(sum(List(1, 2, 3, 4)))
+
+    val multiplyMonoid: Monoid[Int] = new Monoid[Int] {
+      def mappend(a: Int, b: Int): Int = a * b
+      def mzero: Int = 1
+    }
+
+    println(sum(List(1, 2, 3, 4))(multiplyMonoid))
+  }
+
   def main(args: Array[String]): Unit = {
     Wrap("parametricPolymorphismTest")(parametricPolymorphismTest)
     Wrap("subtypePolymorphismTest")(subtypePolymorphismTest)
@@ -204,5 +257,6 @@ object Polymorphism {
     Wrap("sumByIntMonoidTest")(sumByIntMonoidTest)
     Wrap("monoidTestImplicit")(monoidTestImplicit)
     Wrap("insideCompanionTest")(insideCompanionTest)
+    Wrap("multiMonoidTest")(multiMonoidTest)
   }
 }
