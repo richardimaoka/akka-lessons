@@ -1,0 +1,21 @@
+ScalaStyle initial commit
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# Author:    Yu Nishiyama <yu.nishiyama@exchange.co.jp>
+#
+# interactive rebase in progress; onto e556a40
+# Last commands done (9 commands done):
+#    r 12ef831 conditional props, more
+#    r e954149 ScalaStyle initial commit
+# Next commands to do (5 remaining commands):
+#    r deb4c37 grafter mockup
+#    r fe38c9a grafter genericReader to avoid boilerplates
+# You are currently rebasing branch 'master' on 'e556a40'.
+#
+# Changes to be committed:
+#	modified:   build.sbt
+#	new file:   project/plugins.sbt
+#	new file:   scalastyle-config.xml
+#

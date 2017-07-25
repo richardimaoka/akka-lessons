@@ -42,6 +42,8 @@ lazy val lesson1 = (project in file(".")).
 
       "org.zalando" %% "grafter" % "1.7.0",
 
+      "com.github.mpilquist" %% "simulacrum" % "0.10.0",
+
       "org.typelevel" %% "cats" % "0.9.0"
     )
   )
