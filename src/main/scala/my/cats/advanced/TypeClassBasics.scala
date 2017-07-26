@@ -4,10 +4,17 @@ import my.wrapper.Wrapper
 
 object TypeClassBasics {
 
+  /*******************************************************
+   * There are two common ways of specifying an interface:
+   *   1. Interface Objects and
+   *   2. Interface Syntax.
+   *******************************************************/
   def typeClass1(): Unit ={
     import JsonWriterInstances._
 
     /**
+     * 1. Interface Objects, in this case, `Json`
+     *
      * def toJson[A](value: A)(implicit w: JsonWriter[A]): Json
      *
      * JsonWriter instance is passed implicitly due to the above import
@@ -22,6 +29,8 @@ object TypeClassBasics {
     import JsonSyntax._
 
     /**
+     * Interface Syntax, in this case, JsonSyntax
+     *
      * def toJson(implicit w: JsonWriter[A]): Json
      *
      * both import JsonWriterInstances (which includes implicit parameters to pass to `toJson`)
@@ -165,6 +174,7 @@ object TypeClassBasics {
 
     /**
      * First we define an implicit **class** containing our extension methods:
+     * (extension methods = enrich my library pattern)
      */
     object PrintableSyntax {
       implicit class PrintOps[A](value: A) {
@@ -181,6 +191,15 @@ object TypeClassBasics {
     import PrintableSyntax._
     Cat("Garfield", 35, "ginger and black").print
     // Garfield is a 35 year-old ginger and black cat.
+
+
+    /**
+     * We get a compile error if we haven’t
+     * defined an instance of Printable for the relevant type:
+     */
+    import java.util.Date
+    //error: could not find implicit value for parameter p: Printable[java.util.Date]
+    //new Date().print
   }
 
   def main(args: Array[String]): Unit = {
