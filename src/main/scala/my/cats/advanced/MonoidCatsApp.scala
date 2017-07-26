@@ -123,10 +123,72 @@ object MonoidCatsApp {
     //!! very weird!! this does not compile
     //add3(List(Some(1), Some(2)))
 
-    //This is ok .... a bug in Cats?
+    //... but this is ok .... a bug in Cats?
     add3(List(Some(1), Option(2)))
 
     println(add3(List(Some(1), None)))
+
+    /**
+     * We can op onally use Scala’s context bound syntax to write the same code in a friendlier way:
+     * 
+     * See the difference in type declaration [A: Monoid]
+     */
+    def add4[A: Monoid](items: List[A]): A =
+      items.foldLeft(Monoid[A].empty)(_ |+| _)
+
+    add4(List(1,3))
+    add4(List(Option(1), Option(2)))
+
+    //!! very weird!! this does not compile
+    //add4(List(Some(1), Some(2)))
+
+    //... but this is ok .... a bug in Cats?
+    add4(List(Some(1), Option(2)))
+    //Probably not a bug ... maybe due to type variance and Cats being in favor of invariant type classes
+    //See the associated chapter(s) in the Advanced Scala book
+
+    println(add4(List(Some(1), None)))
+
+    add4(List(Some(1), None, Some(2), None, Some(3)))
+    // res10: Option[Int] = Some(6)
+  }
+
+  def typeVariance(): Unit = {
+    //import cats.instances.option._
+    import cats.syntax.option._
+
+    Some(1)
+    // res0: Some[Int] = Some(1)
+
+    1.some
+    // res1: Option[Int] = Some(1)
+
+    None
+    // res2: None.type = None
+
+    none[Int]
+    // res3: Option[Int] = None
+  }
+
+  def identicallyTyped(): Unit = {
+    import cats.Monoid
+    import cats.instances.int._
+    import cats.syntax.semigroup._
+
+    //multiple type class instances when several are available for a specific type
+    //
+    //We can always define or import a type class instance into the local scope.
+    //his will take precedence over other type class instances in the implicit scope:
+    implicit val multiplicationMonoid =
+      new Monoid[Int] {
+        def empty: Int = 1
+        override def combine(x: Int, y: Int): Int = x * y
+      }
+
+    // multiplicationMonoid takes precedence over cats.instances.int
+    // weird, this doesn't compile...
+    //println(3 |+| 2)
+    // res5: Int = 6 // not 5
   }
 
   def main(args: Array[String]): Unit = {
@@ -134,6 +196,8 @@ object MonoidCatsApp {
     Wrapper("monoid")(monoid)
     Wrapper("semiGroup")(semiGroup)
     Wrapper("exercise1")(exercise1)
+    Wrapper("exercise2")(exercise2)
+    Wrapper("identicallyTyped")(identicallyTyped)
   }
 
 }
