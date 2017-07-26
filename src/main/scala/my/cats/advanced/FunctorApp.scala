@@ -64,6 +64,52 @@ object FunctorApp {
 
   }
 
+  def functorTest(): Unit ={
+    import cats.Functor
+    import cats.instances.list._
+    import cats.instances.option._
+
+    val list1 = List(1, 2, 3)
+    // list1: List[Int] = List(1, 2, 3)
+
+    /**
+     * See Functor[List]
+     *
+     * def map[A, B](fa: F[A])(f: A => B): F[B]
+     */
+    val list2 = Functor[List].map(list1)(_ * 2)
+    // list2: List[Int] = List(2, 4, 6)
+
+    val option1 = Option(123)
+    // option1: Option[Int] = Some(123)
+
+    val option2 = Functor[Option].map(option1)(_.toString)
+    // option2: Option[String] = Some(123)
+  }
+
+  def listTest(): Unit = {
+    import cats.Functor
+    import cats.instances.option._
+
+    val func = (x: Int) => x + 1
+    // func: Int => Int = <function1>
+
+    /**
+     * def lift[A, B](f: A => B): F[A] => F[B]
+     *   = map(_)(f)
+     *
+     * (i.e.) lifted is a function to convert from F[A] to F[B]
+     * in this case,
+     *  Option[A] to Option[B]
+     */
+    val lifted = Functor[Option].lift(func)
+
+    // lifted: Option[Int] => Option[Int] = cats.Functor$$Lambda$28362/1686307543@514a39b6
+
+    lifted(Option(1))
+    // res0: Option[Int] = Some(2)
+  }
+
   def main(args: Array[String]): Unit = {
 
   }
