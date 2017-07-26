@@ -11,18 +11,6 @@ trait JsonWriter[A] {
   def write(value: A): Json
 }
 
-/*******************************************************
- * There are two common ways of specifying an interface:
- *   1. Interface Objects and
- *   2. Interface Syntax.
- *
- * This Json object is 1. Interface Object
- *******************************************************/
-object Json {
-  def toJson[A](value: A)(implicit w: JsonWriter[A]): Json =
-    w.write(value)
-}
-
 object JsonWriterInstances {
 
   implicit val stringJsonWriter = new JsonWriter[String] {
@@ -48,6 +36,18 @@ object JsonWriterInstances {
       ))
   }
   // etc...
+}
+
+/*******************************************************
+ * There are two common ways of specifying an interface:
+ *   1. Interface Objects and
+ *   2. Interface Syntax.
+ *
+ * This Json object is 1. Interface Object
+ *******************************************************/
+object Json {
+  def toJson[A](value: A)(implicit w: JsonWriter[A]): Json =
+    w.write(value)
 }
 
 /*******************************************************
