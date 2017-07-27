@@ -97,7 +97,7 @@ object FunctorApp {
     /**
      * def lift[A, B](f: A => B): F[A] => F[B]
      *   = map(_)(f)
-     *
+     *   
      * (i.e.) lifted is a function to convert from F[A] to F[B]
      * in this case,
      *  Option[A] to Option[B]
