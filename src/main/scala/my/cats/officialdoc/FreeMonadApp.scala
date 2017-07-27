@@ -259,6 +259,103 @@ object FreeMonadApp {
     sealed abstract class Free[F[_], A]
     case class Pure[F[_], A](a: A) extends Free[F, A]
     case class Suspend[F[_], A](a: F[Free[F, A]]) extends Free[F, A]
+
+
+    /**
+     * In Cats, FlatMapped is defined as follows:
+     */
+    case class FlatMapped[S[_], B, C](c: Free[S, C], f: C => Free[S, B])
+      extends Free[S, B]
+  }
+
+  def freeT(): Unit ={
+    import cats.free._
+    // import cats.free._
+
+    import cats._
+    // import cats._
+
+    import cats.data._
+    // import cats.data._
+
+    /* A base ADT for the user interaction without state semantics */
+    sealed abstract class Teletype[A] extends Product with Serializable
+    // defined class Teletype
+
+    final case class WriteLine(line : String) extends Teletype[Unit]
+    // defined class WriteLine
+
+    final case class ReadLine(prompt : String) extends Teletype[String]
+    // defined class ReadLine
+
+    /**
+     * Teletype*T*
+     */
+    type TeletypeT[M[_], A] = FreeT[Teletype, M, A]
+    // defined type alias TeletypeT
+
+    type Log = List[String]
+    // defined type alias Log
+
+    /** Smart constructors, notice we are abstracting over any MonadState instance
+     *  to potentially support other types beside State
+     */
+    class TeletypeOps[M[_]](implicit MS : MonadState[M, Log]) {
+      def writeLine(line : String) : TeletypeT[M, Unit] =
+        FreeT.liftF[Teletype, M, Unit](WriteLine(line))
+      def readLine(prompt : String) : TeletypeT[M, String] =
+        FreeT.liftF[Teletype, M, String](ReadLine(prompt))
+      def log(s : String) : TeletypeT[M, Unit] =
+        FreeT.liftT[Teletype, M, Unit](MS.modify(s :: _))
+    }
+    // defined class TeletypeOps
+
+    object TeletypeOps {
+      implicit def teleTypeOpsInstance[M[_]](implicit MS : MonadState[M, Log]) : TeletypeOps[M] = new TeletypeOps
+    }
+    // defined object TeletypeOps
+    // warning: previously defined class TeletypeOps is not a companion to object TeletypeOps.
+    // Companions must be defined together; you may wish to use :paste mode for this.
+
+    type TeletypeState[A] = State[List[String], A]
+    // defined type alias TeletypeState
+
+    def program(implicit TO : TeletypeOps[TeletypeState]) : TeletypeT[TeletypeState, Unit] = {
+      for {
+        userSaid <- TO.readLine("what's up?!")
+        _ <- TO.log(s"user said : $userSaid")
+        _ <- TO.writeLine("thanks, see you soon!")
+      } yield ()
+    }
+    // program: (implicit TO: TeletypeOps[TeletypeState])TeletypeT[TeletypeState,Unit]
+
+    def interpreter = new (Teletype ~> TeletypeState) {
+      def apply[A](fa : Teletype[A]) : TeletypeState[A] = {
+        fa match {
+          case ReadLine(prompt) =>
+            println(prompt)
+            val userInput = "hanging in here" //scala.io.StdIn.readLine()
+            StateT.pure[Eval, List[String], A](userInput)
+          case WriteLine(line) =>
+            StateT.pure[Eval, List[String], A](println(line))
+        }
+      }
+    }
+    // interpreter: cats.~>[Teletype,TeletypeState]
+
+    import TeletypeOps._
+    // import TeletypeOps._
+
+    val state = program.foldMap(interpreter)
+    // state: TeletypeState[Unit] = cats.data.StateT@2e3d13d
+
+    val initialState = Nil
+    // initialState: scala.collection.immutable.Nil.type = List()
+
+    val (stored, _) = state.run(initialState).value
+    // what's up?!
+    // thanks, see you soon!
+    // stored: List[String] = List(user said : hanging in here)
   }
 
   def main(args: Array[String]): Unit = {
