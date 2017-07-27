@@ -5,6 +5,10 @@ lazy val lesson1 = (project in file(".")).
     scalaVersion := "2.12.2",
     resolvers +=
       "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+
+    //for eff monad, http://atnos-org.github.io/eff/org.atnos.site.Installation.html
+    scalacOptions += "-Ypartial-unification",
+
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor" % "2.5.3",
       "com.typesafe.akka" %% "akka-agent" % "2.5.3",
@@ -43,6 +47,7 @@ lazy val lesson1 = (project in file(".")).
       "org.slf4j" % "slf4j-simple" % "1.7.7",
 
       "org.zalando" %% "grafter" % "1.7.0",
+      "org.atnos" %% "eff" % "4.4.0",
 
       "com.github.mpilquist" %% "simulacrum" % "0.10.0",
       "org.scalamacros" %% "resetallattrs" % "1.0.0",
