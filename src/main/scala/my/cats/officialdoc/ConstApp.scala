@@ -1,5 +1,7 @@
 package my.cats.officialdoc
 
+import cats.Id
+
 object ConstApp {
 
   def constTest(): Unit = {
@@ -109,12 +111,91 @@ object ConstApp {
 
       //in terms of modifyF
       def modify(s: S)(f: A => A): S = modifyF[Id](s)(f)
+
       /**
        * Id is a higher-kind but actually Id[A] == A
        * So, modifyF[Id] is without higher-kind, i.e. `modify`
        */
 
       def modifyF[F[_] : Functor](s: S)(f: A => F[A]): F[S]
+    }
+  }
+
+  def lensFifth(): Unit = {/*
+    import cats.data.Const
+    import cats.Functor
+
+    implicit def constFunctor[X]: Functor[Const[X, ?]] =
+      new Functor[Const[X, ?]] {
+        // Recall Const[X, A] ~= X, so the function is not of any use to us
+        def map[A, B](fa: Const[X, A])(f: A => B): Const[X, B] =
+          Const(fa.getConst)
+      }
+
+    trait Lens[S, A] {
+      def modifyF[F[_] : Functor](s: S)(f: A => F[A]): F[S]
+
+      def set(s: S, a: A): S = modify(s)(_ => a)
+
+      def modify(s: S)(f: A => A): S = modifyF[Id](s)(f)
+
+      def get(s: S): A = {
+        val storedValue = modifyF[Const[A, ?]](s)(a => Const(a))
+        storedValue.getConst
+      }
+    }*/
+  }
+
+  def exampleTraverse1(): Unit = {
+    import cats.{Applicative, Monoid}
+
+    trait Foldable[F[_]] {
+      // Given a collection of data F[A], and a function mapping each A to a B where B has a Monoid instance,
+      // reduce the collection down to a single B value using the monoidal behavior of B
+      def foldMap[A, B: Monoid](fa: F[A])(f: A => B): B
+    }
+
+    trait Traverse[F[_]] {
+      // Given a collection of data F[A], for each value apply the function f which returns an effectful
+      // value. The result of traverse is the composition of all these effectful values.
+      def traverse[G[_] : Applicative, A, B](fa: F[A])(f: A => G[B]): G[F[B]]
+    }
+  }
+
+  def exampleTraverse2(): Unit = {
+    import cats.{Applicative, Monoid}
+
+    trait Foldable[F[_]] {
+      // Given a collection of data F[A], and a function mapping each A to a B where B has a Monoid instance,
+      // reduce the collection down to a single B value using the monoidal behavior of B
+      def foldMap[A, B: Monoid](fa: F[A])(f: A => B): B
+    }
+
+    trait Traverse[F[_]] extends Foldable[F] {
+      def traverse[G[_] : Applicative, A, X](fa: F[A])(f: A => G[X]): G[F[X]]
+
+      def foldMap[A, B: Monoid](fa: F[A])(f: A => B): B
+    }
+  }
+
+  def exampleTraverse3(): Unit = {
+    import cats.{Applicative, Monoid}
+    import cats.data.Const
+
+    implicit def constApplicative[Z]: Applicative[Const[Z, ?]] =
+      new Applicative[Const[Z, ?]] {
+        def pure[A](a: A): Const[Z, A] = ???
+
+        def ap[A, B](f: Const[Z, A => B])(fa: Const[Z, A]): Const[Z, B] = ???
+      }
+
+    trait Traverse[F[_]] extends Foldable[F] {
+      def traverse[G[_] : Applicative, A, X](fa: F[A])(f: A => G[X]): G[F[X]]
+
+      def foldMap[A, B : Monoid](fa: F[A])(f: A => B): B = {
+        val const: Const[B, F[Nothing]] = traverse[Const[B, ?], A, Nothing](fa)(a => Const(f(a)))
+        const.getConst
+      }
     }
   }
 
