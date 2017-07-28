@@ -229,6 +229,7 @@ object FunctorApp {
 
   def exercise1(): Unit = {
     import cats.Functor
+    import cats.syntax.functor._
 
     sealed trait Tree[+A]
     final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
@@ -264,6 +265,103 @@ object FunctorApp {
 
     branch(leaf(10), leaf(20)).map(_ * 2)
     // res7: Tree[Int] = Branch(Leaf(20),Leaf(40))
+  }
+
+  def contraAndInvariant(): Unit = {
+    Option(1).map(_ + 2).map(_ * 3).map(_ + 100)
+    // res0: Option[Int] = Some(109)
+
+    trait Printable[A] {
+      def format(value: A): String
+
+      /**
+       * You can call `contramap` for an arbitrary type [B]
+       */
+      def contramap[B](func: B => A): Printable[B] =
+        ???
+    }
+
+    def format[A](value: A)(implicit p: Printable[A]): String =
+      p.format(value)
+
+    case class MyType(a: Int)
+
+    val my = MyType(10)
+
+    val myPrintable = new Printable[MyType] {
+      def format(value: MyType): String = s"MyType(a = ${value})"
+      //def contramap[Option[String]](func: Option[String] => MyType)
+    }
+  }
+
+  def contraAndInvariantExercise(): Unit = {
+    import cats.syntax.functor._
+
+    trait Printable[A] {
+      def format(value: A): String
+      def contramap[B](func: B => A): Printable[B] = {
+        val self = this
+        new Printable[B] {
+          def format(value: B): String =
+          self.format(func(value))
+        }
+      }
+    }
+    def format[A](value: A)(implicit p: Printable[A]): String =
+      p.format(value)
+
+    implicit val stringPrintable:  Printable[String] =
+      new Printable[String] {
+        def format(value: String): String =
+          "\"" + value + "\""
+      }
+
+    implicit val booleanPrintable: Printable[Boolean] =
+      new Printable[Boolean] {
+        def format(value: Boolean): String =
+          if(value) "yes" else "no"
+      }
+
+    format("hello")
+    // res4: String = "hello"
+
+    format(true)
+    // res5: String = yes
+
+    final case class Box[A](value: A)
+
+    implicit def boxPrintable[A](implicit p: Printable[A]): Printable[Box[A]] =
+      p.contramap[Box[A]](_.value)
+      /**
+       * def contramap[B](func: B => A): Printable[B]
+       * Printable[A].contramap[B](func: B => A): Printable[B]
+       *   where B = Box[A], so
+       * Printable[A].contramap[Box[A]](func: Box[A] => A): Printable[Box[A]]
+       *   and
+       *   func: Box[A] => A = _.value
+       */
+
+    format(Box("hello world"))
+    // res6: String = "hello world"
+
+    format(Box(true))
+    // res7: String = yes
+
+    /**
+     * If we don’t have a Printable for the contents of the Box,
+     * calls to format should fail to compile:
+     *
+     *   could not find implicit value for parameter p: Printable[Box[Int]]
+     */
+    //format(Box(123))
+
+    case class MyType(a: Int)
+
+    val my = MyType(10)
+
+    val myPrintable = new Printable[MyType] {
+      def format(value: MyType): String = s"MyType(a = ${value})"
+    }
   }
 
   def main(args: Array[String]): Unit = {
