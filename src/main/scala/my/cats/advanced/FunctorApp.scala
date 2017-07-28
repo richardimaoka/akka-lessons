@@ -1,5 +1,7 @@
 package my.cats.advanced
 
+import my.wrapper.Wrap
+
 object FunctorApp {
 
   def mapTest(): Unit ={
@@ -110,7 +112,161 @@ object FunctorApp {
     // res0: Option[Int] = Some(2)
   }
 
-  def main(args: Array[String]): Unit = {
+  def syntaxTest(): Unit = {
+    import cats.instances.function._
+    import cats.syntax.functor._
 
+    val func1 = (a: Int) => a + 1
+    // func1: Int => Int = <function1>
+
+    val func2 = (a: Int) => a * 2
+    // func2: Int => Int = <function1>
+
+    val func3 = func1.map(func2)
+    // func3: Int => Int = scala.runtime.
+    //AbstractFunction1$$Lambda$9405/272413009@5f430fe0
+
+    func3(123)
+    // res1: Int = 248
+
+    /**
+     * Better example?
+     */
+
+    val func4: Int => String =
+      (a: Int) => s"${a} + ${a} = ${a + a}"
+
+    val func5: String => Option[String] =
+      (a: String) => Some(a)
+
+    val func45 = func4.map(func5)
+    //Some(16 + 16 = 32)
+
+    println(func45)
+    println(func45(16))
+
+  }
+
+  def syntaxTest2(): Unit = {
+    import cats.instances.function._
+    import cats.syntax.functor._
+
+    /**
+     * In other words, “mapping” over a Function1 is just func on composion:
+     */
+    val func1 = (x: Int)    => x.toDouble
+    // func1: Int => Double = <function1>
+
+    val func2 = (y: Double) => y * 2
+    // func2: Double => Double = <function1>
+
+    val func3 = func1.map(func2)
+    // func3: Int => Double = scala.runtime.
+    //AbstractFunction1$$Lambda$9405/272413009@2deb99ee
+
+    func3(1) // function composition by calling map
+    // res8: Double = 2.0
+
+    func2(func1(1)) // function composition written out by hand
+    // res9: Double = 2.0
+  }
+
+  def catsFunctorTest(): Unit ={
+    import cats.Functor
+    import cats.instances.list._
+    import cats.instances.option._
+
+    val list1 = List(1, 2, 3)
+    // list1: List[Int] = List(1, 2, 3)
+
+    val list2 = Functor[List].map(list1)(_ * 2)
+    // list2: List[Int] = List(2, 4, 6)
+
+    val option1 = Option(123)
+    // option1: Option[Int] = Some(123)
+
+    //F[Int] map(f: Int => String) = F[String]
+    val option2 = Functor[Option].map(option1)(_.toString)
+    // option2: Option[String] = Some(123)
+
+    //F[Int] map(f: Int => String) = F[String]
+    val list3 = Functor[List].map(List(1,2,3))(_.toString)
+
+    val func = (x: Int) => x + 1
+    // func: Int => Int = <function1>
+
+    val lifted = Functor[Option].lift(func)
+    // lifted: Option[Int] => Option[Int] = cats.
+    //Functor$$Lambda$28362/1686307543@514a39b6
+
+    lifted(Option(1))
+    // res0: Option[Int] = Some(2)
+  }
+
+  def instancesForCustomTypes(): Unit = {
+    import cats.Functor
+
+    implicit val optionFunctor = new Functor[Option] {
+      def map[A, B](value: Option[A])(func: A => B): Option[B] =
+        value.map(func)
+    }
+
+    import scala.concurrent.{Future, ExecutionContext}
+
+    /**
+     * we need to inject dependencies into our instances.
+     * For example, if we had to define a custom Functor for Future,
+     * we would need to account for the implicit ExecutionContext parameter on future.map.
+     * We can’t add extra parameters to functor.map so we have to account for the dependency
+     * when we create the instance:
+     */
+    implicit def futureFunctor(implicit ec: ExecutionContext) =
+      new Functor[Future] {
+        def map[A, B](value: Future[A])(func: A => B): Future[B] =
+        value.map(func)
+      }
+  }
+
+  def exercise1(): Unit = {
+    import cats.Functor
+
+    sealed trait Tree[+A]
+    final case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
+    final case class Leaf[A](value: A) extends Tree[A]
+
+
+    implicit val treeFunctor = new Functor[Tree] {
+      def map[A, B](value: Tree[A])(func: A => B): Tree[B] = value match {
+        case Branch(l,r) => Branch(map(l)(func),map(r)(func))
+        case Leaf(v) => Leaf(func(v))
+      }
+    }
+
+    //value map is not a member of Branch[Int]
+    //Branch(Leaf(10), Leaf(20)).map(_ * 2)
+    /**
+     * Oops! This is the same invariance problem we saw with Monoids.
+     * The compiler can’t find a Functor instance for Leaf.
+     * Let’s add some smart constructors to compensate:
+     */
+
+    def branch[A](left: Tree[A], right: Tree[A]): Tree[A] =
+      Branch(left, right)
+
+    def leaf[A](value: A): Tree[A] =
+      Leaf(value)
+
+    /**
+     * Now we can use our Functor properly:
+     */
+    leaf(100).map(_ * 2)
+    // res6: Tree[Int] = Leaf(200)
+
+    branch(leaf(10), leaf(20)).map(_ * 2)
+    // res7: Tree[Int] = Branch(Leaf(20),Leaf(40))
+  }
+
+  def main(args: Array[String]): Unit = {
+    Wrap("syntaxTest")(syntaxTest)
   }
 }

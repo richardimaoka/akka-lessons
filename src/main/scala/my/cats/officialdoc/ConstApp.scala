@@ -178,7 +178,7 @@ object ConstApp {
     }
   }
 
-  def exampleTraverse3(): Unit = {
+  def exampleTraverse3(): Unit = {/*
     import cats.{Applicative, Monoid}
     import cats.data.Const
 
@@ -196,7 +196,7 @@ object ConstApp {
         val const: Const[B, F[Nothing]] = traverse[Const[B, ?], A, Nothing](fa)(a => Const(f(a)))
         const.getConst
       }
-    }
+    }*/
   }
 
   def main(args: Array[String]): Unit = {
