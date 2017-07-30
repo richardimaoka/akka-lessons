@@ -17,6 +17,13 @@ object FlatMapMergeApp {
     val async = Flow[Int].map(_ * 2).async
     val fut = Source(0 to 9)
       .map(_ * 10)
+      /**
+       * def flatMapMerge[T, M](breadth: Int, f: Out ⇒ Graph[SourceShape[T], M]): Repr[T]
+       *   = map(f).via(new FlattenMerge[T, M](breadth))
+       *
+       * (i.e.) firstly f is applied via `map`
+       * So what FlattenMerge receives (gets pushed) is Source to which `f` is already applied
+       */
       .flatMapMerge(5, i ⇒ Source(i to (i + 9)).via(async))
       .grouped(100)
       .runWith(Sink.head)
