@@ -260,11 +260,14 @@ object FunctorApp {
     /**
      * Now we can use our Functor properly:
      */
-    leaf(100).map(_ * 2)
+    leaf(100).map(_ * 2) //Ah... leaf()'s return type is Tree[A] so it's calling Tree.map()
     // res6: Tree[Int] = Leaf(200)
 
-    branch(leaf(10), leaf(20)).map(_ * 2)
+    branch(leaf(10), leaf(20)).map(_ * 2) //Ah... branch()'s return type is Tree[A] so it's calling Tree.map()
     // res7: Tree[Int] = Branch(Leaf(20),Leaf(40))
+
+    // This still does not compile
+    //Branch(Leaf(10), Leaf(20)).map(_ * 2)
   }
 
   def contraAndInvariant(): Unit = {
