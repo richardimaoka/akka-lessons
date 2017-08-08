@@ -2,7 +2,10 @@ package my.grafter
 import org.zalando.grafter.GenericReader._
 import cats.data.Reader
 
-case class ApplicationConfig(http: HttpConfig, db: DbConfig)
+case class ApplicationConfig(
+  http: HttpConfig,
+  db: DbConfig
+)
 
 object ApplicationConfig {
 
