@@ -189,14 +189,148 @@ object MonadApp {
     import cats.instances.list._
     Monad[List].flatMap(List(1, 2, 3))(x => List(x, x*10))
     // res1: List[Int] = List(1, 10, 2, 20, 3, 30)
+    /**
+     * With the new mental model
+     * For possible values x = 1, 2, 3
+     * There are 3 possible values y = x, x*10
+     * So in total, there are 6 values flattened
+     */
 
     import cats.instances.vector._
     Monad[Vector].flatMap(Vector(1, 2, 3))(x => Vector(x, x*10))
     // res2: Vector[Int] = Vector(1, 10, 2, 20, 3, 30)
+
+    import cats.instances.future._
+    import scala.concurrent._
+    import scala.concurrent.duration._
+
+    // val fm = Monad[Future]
+    // <console>:37: error: could not find implicit value for
+    // parameter instance: cats.Monad[scala.concurrent.Future]
+    // val fm = Monad[Future]
+    // ^
+
+    import scala.concurrent.ExecutionContext.Implicits.global
+    val fm = Monad[Future]
+    // fm: cats.Monad[scala.concurrent.Future] = cats.instances.
+    // FutureInstances$$anon$1@1c54d4ad
+
+    /**
+     * The below 3 forms are equivalent:
+     */
+    val result = Await.result(
+      fm.flatMap(fm.pure(1)) { x =>
+        fm.pure(x + 2)
+      },
+      1.second
+    )
+    println(result)
+
+    val result2 = Await.result(
+      fm.flatMap(Future(1)) { x => //it is like Future(1).flatMap( x => ...
+        Future(x + 2)
+      },
+      1.second
+    )
+    println(result2)
+
+    val result3 = Await.result(
+      for {
+        x <- fm.pure(1)
+        y <- fm.pure(x + 2)
+      } yield y,
+      1.second
+    )
+    println(result3)
+  }
+
+  def monadSyntax(): Unit = {
+    import cats.syntax.applicative._
+    import cats.instances.option._
+    import cats.instances.list._
+
+    1.pure[Option]
+    // res4: Option[Int] = Some(1)
+
+    1.pure[List]
+    // res5: List[Int] = List(1)
+
+    import scala.language.higherKinds
+    import cats.Monad
+    import cats.syntax.functor._
+    import cats.syntax.flatMap._
+
+    def sumSquare[M[_] : Monad](a: M[Int], b: M[Int]): M[Int] =
+      a.flatMap(x => b.map(y => x*x + y*y))
+
+    import cats.instances.option._
+    import cats.instances.list._
+
+    sumSquare(Option(3), Option(4))
+    // res8: Option[Int] = Some(25)
+
+    sumSquare(List(1, 2, 3), List(4, 5))
+    // res9: List[Int] = List(17, 26, 20, 29, 25, 34)
+
+    /**
+     *  We can rewrite this code using for comprehensions.
+     */
+    def sumSquareFor[M[_] : Monad](a: M[Int], b: M[Int]): M[Int] =
+      for {
+        x <- a
+        y <- b
+      } yield x*x + y*y
+
+    sumSquareFor(Option(3), Option(4))
+    // res10: Option[Int] = Some(25)
+
+    sumSquare(List(1, 2, 3), List(4, 5))
+    // res11: List[Int] = List(17, 26, 20, 29, 25, 34)
+  }
+
+  def identityMonad(): Unit = {
+    import scala.language.higherKinds
+    import cats.Monad
+    import cats.syntax.functor._
+    import cats.syntax.flatMap._
+
+    def sumSquare[M[_] : Monad](a: M[Int], b: M[Int]): M[Int] =
+      for {
+        x <- a
+        y <- b
+      } yield x*x + y*y
+
+    /**
+     * This method works well on Options and Lists but we can’t call it
+     * passing in plain values:
+     */
+    //sumSquare(3, 4)
+    // <console>:22: error: no type parameters for method sumSquare:
+    // (a: M[Int], b: M[Int])(implicit evidence$1: cats.Monad[M])M
+    //   [Int] exist so that it can be applied to arguments (Int, Int
+    // )
+    // --- because ---
+    // argument expression's type is not compatible with formal
+    // parameter type;
+    // found : Int
+    // required: ?M[Int]
+    // sumSquare(3, 4)
+    // ^
+    // <console>:22: error: type mismatch;
+    // found : Int(3)
+    // required: M[Int]
+    // sumSquare(3, 4)
+    // ^
+    // <console>:22: error: type mismatch;
+    // found : Int(4)
+    // required: M[Int]
+    // sumSquare(3, 4)
+    // ^
   }
 
   def main(args: Array[String]): Unit = {
     Wrap("optionsExamples")(optionsExamples)
     Wrap("listMonads")(listMonads)
+    Wrap("defaultInstances")(defaultInstances)
   }
 }
