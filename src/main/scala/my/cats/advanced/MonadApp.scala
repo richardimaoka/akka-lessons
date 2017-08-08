@@ -108,7 +108,7 @@ object MonadApp {
      * function that return Lists === function with multiple return values
      *   => flatMap becomes a construct that calculates results
      *      from permutations ons and combinations of intermediate values.
-     */
+     **/
     def numbersBetween(min: Int, max: Int): List[Int] =
       (min to max).toList
 
@@ -326,11 +326,317 @@ object MonadApp {
     // required: M[Int]
     // sumSquare(3, 4)
     // ^
+
+    /**
+     * It would be incredibly useful if we could use sumSquare with a
+     * combination of monadic and non-monadic parameters.
+     */
+    type Id[A] = A
+    println(sumSquare(3 : Id[Int], 4 : Id[Int]))
+    // res2: cats.Id[Int] = 25
+
+    val a = "Dave" : Id[String]
+    println(a)
+    // res3: cats.Id[String] = Dave
+
+    val b = 123 : Id[Int]
+    println(b)
+    // res4: cats.Id[Int] = 123
+
+    val c = List(1, 2, 3) : Id[List[Int]]
+    println(c)
+    // res5: cats.Id[List[Int]] = List(1, 2, 3)
+
+    val aa = Monad[Id].pure(3)
+    // a: cats.Id[Int] = 3
+    val bb = Monad[Id].flatMap(aa)(_ + 1)
+    // b: cats.Id[Int] = 4
+
+    import cats.syntax.flatMap._
+    import cats.syntax.functor._
+
+    for {
+      x <- aa
+      y <- bb
+    } yield x + y
+    // res6: cats.Id[Int] = 7
+
+    /**
+     * The main use for Id is to write generic methods like sumSquare
+     * that operate on monadic and non-monadic data types. For example,
+     * we can run code asynchronously in production using Future and
+     * synchronously in test using Id:
+     */
+    import scala.concurrent._
+    import scala.concurrent.duration._
+    import scala.concurrent.ExecutionContext.Implicits.global
+    import cats.instances.future._
+    // In production: async
+    Await.result(sumSquare(Future(3), Future(4)), 1.second)
+    // res8: Int = 25
+
+    // In test: sync
+    sumSquare(aa, bb)
+    // res10: cats.Id[Int] = 25
+  }
+
+  def identityExercises(): Unit ={
+    import cats.Id
+    def pure[A](value: A): Id[A] =
+      value
+
+    pure(123)
+    // res14: cats.Id[Int] = 123
+
+    def map[A, B](initial: Id[A])(func: A => B): Id[B] =
+      func(initial)
+
+    map(123)(_ * 2)
+    // res15: cats.Id[Int] = 246
+
+    def flatMap[A, B](initial: Id[A])(func: A => Id[B]): Id[B] =
+      func(initial)
+    // flatMap: [A, B](initial: cats.Id[A])(func: A => cats.Id[B])
+    // cats.Id[B]
+
+    flatMap(123)(_ * 2)
+    // res16: cats.Id[Int] = 246
+
+    import cats.Monad
+    import cats.syntax.flatMap._
+    import cats.syntax.functor._
+    def sumSquare[M[_] : Monad](a: M[Int], b: M[Int]): M[Int] =
+      for {
+        x <- a
+        y <- b
+      } yield x*x + y*y
+
+    sumSquare(3 : Id[Int], 4 : Id[Int])
+  }
+
+  def either(): Unit ={
+    /**
+     * In Scala 2.11, Either was unbiased. It had no map or flatMap method:
+     * Scala 2.11 example (Hm? it compiles in 2.12)
+     */
+    Right(123).flatMap(x => Right(x * 2))
+    // In Scala 2.11
+    // <console>:12: error: value flatMap is not a member
+    // of scala.util.Right[Nothing, Int]
+    // Right(123).flatMap(x => Right(x * 2))
+    // ^
+
+    /**
+     * Valid in Scala 2.11 and Scala 2.12
+     * Instead of calling map or flatMap directly, we had to decide which side
+     *  we wanted to be the “correct” side by taking a left- or right-projection
+     */
+    val either1: Either[String, Int] = Right(123)
+    // either1: Either[String,Int] = Right(123)
+
+    val either2: Either[String, Int] = Right(321)
+    // either2: Either[String,Int] = Right(321)
+
+    println(either1.right.flatMap(x => Right(x * 2)))
+    // res2: scala.util.Either[String,Int] = Right(246)
+
+    println(either2.left.flatMap(x => Left(x + "!!!")))
+    // res3: scala.util.Either[String,Int] = Right(321)
+    /**
+     * This made the Scala 2.11 version of Either incovenient to use as a
+     * monad. If we wanted to use for comprehensions, for example, we had
+     * to insert calls to .right in every generator clause:
+     */
+
+    for {
+      a <- either1.right
+      b <- either2.right
+    } yield a + b
+    // res4: scala.util.Either[String,Int] = Right(444)
+
+    /**
+     * In Scala 2.12, Either was redesigned.
+     * Either can be used as Monad
+     */
+    for {
+      a <- either1
+      b <- either2
+    } yield a + b
+    // res5: scala.util.Either[String,Int] = Right(444)
+
+    import cats.syntax.either._
+    val a = 3.asRight[String]
+    // a: Either[String,Int] = Right(3)
+    val b = 4.asRight[String]
+    // b: Either[String,Int] = Right(4)
+    val result = for {
+      x <- a
+      y <- b
+    } yield x*x + y*y
+    // res6: scala.util.Either[String,Int] = Right(25)
+
+    println(result)
+
+    /**
+     * The asLeft and asRight methods have advantages over
+     * Left.apply and Right.apply in terms of type inference. The
+     * following code provides an example:
+     **
+     *def countPositive(nums: List[Int]) =
+     *nums.foldLeft(Right(0)) { (accumulator, num) =>
+     *if(num > 0) {
+     *accumulator.map(_ + 1)
+     *} else {
+     *Left("Negative. Stopping!")
+     *}
+     * }
+     **
+     *1. the type of the accumulator ends up being Right instead of Either;
+     *2. we didn’t specify type parameters for Right.apply so the compiler
+     *infers the left parameter as Nothing
+    */
+    // <console>:18: error: type mismatch;
+    // found   : scala.util.Either[Nothing,Int]
+    // required: scala.util.Right[Nothing,Int]
+    // accumulator.map(_ + 1)
+    // ^
+    // <console>:20: error: type mismatch;
+    // found   : scala.util.Left[String,Nothing]
+    // required: scala.util.Right[Nothing,Int]
+    // Left("Negative. Stopping!")
+    // ^
+
+    def countPositive(nums: List[Int]) =
+      // difference: 0.asRight - Switching to asRight avoids both of these problems.
+      // It as a return type of Either
+      nums.foldLeft(0.asRight[String]) { (accumulator, num) =>
+        if(num > 0) {
+          accumulator.map(_ + 1)
+        } else {
+          Left("Negative. Stopping!")
+        }
+      }
+
+    countPositive(List(1, 2, 3))
+    // res7: Either[String,Int] = Right(3)
+    countPositive(List(1, -2, 3))
+    // res8: Either[String,Int] = Left(Negative. Stopping!)
+
+    println(Either.catchOnly[NumberFormatException]("foo".toInt))
+    // Left(java.lang.NumberFormatException: For input string: "foo")
+
+    println(Either.catchNonFatal(sys.error("Badness")))
+    // Left(java.lang.RuntimeException: Badness)
+
+    println(Either.fromTry(scala.util.Try("foo".toInt)))
+    // Left(java.lang.NumberFormatException: For input string: "foo")
+
+    println(Either.fromOption[String, Int](None, "Badness"))
+    // Left(Badness)
+
+    /**
+     * 4.4.3 Transforming Eithers
+     */
+
+    import cats.syntax.either._
+
+    "Error".asLeft[Int].getOrElse(0)
+    // res9: Int = 0
+
+    "Error".asLeft[Int].orElse(2.asRight[String])
+    // res10: Either[String,Int] = Right(2)
+
+    -1.asRight[String].ensure("Must be non-negative!")(_ > 0)
+    // res11: Either[String,Int] = Left(Must be non-negative!)
+
+    val t1 = "error".asLeft[String] recover {
+      case str: String =>
+        "Recovered from " + str
+    }
+    println(s""""error".asLeft[String] = ${"error".asLeft[String]}""")
+    println(s"t1: $t1")
+    // res12: Either[String,String] = Right(Recovered from error)
+
+    val t2 = "error".asLeft[String] recoverWith {
+      case str: String =>
+        Right("Recovered from " + str)
+    }
+    println(s"t2: $t2")
+    // res13: Either[String,String] = Right(Recovered from error)
+
+    "foo".asLeft[Int].leftMap(_.reverse)
+    // res14: Either[String,Int] = Left(oof)
+
+    6.asRight[String].bimap(_.reverse, _ * 7)
+    // res15: Either[String,Int] = Right(42)
+
+    "bar".asLeft[Int].bimap(_.reverse, _ * 7)
+    // res16: Either[String,Int] = Left(rab)
+
+    123.asRight[String]
+    // res17: Either[String,Int] = Right(123)
+
+    123.asRight[String].swap
+    // res18: scala.util.Either[Int,String] = Left(123)
+
+
+    /**
+     * Fail-Fast Error Handling
+     *  Either is typically used to implement fail-fast error handling.
+     */
+    for {
+      a <- 1.asRight[String]
+      b <- 0.asRight[String]
+      c <- if(b == 0) "DIV0".asLeft[Int] else (a / b).asRight[String
+        ]
+    } yield c * 100
+    // res19: scala.util.Either[String,Int] = Left(DIV0)
+
+    /**
+     * 4.4.5 Representing Errors
+     */
+    sealed trait LoginError extends Product with Serializable
+    final case class UserNotFound(
+      username: String
+    ) extends LoginError
+
+    final case class PasswordIncorrect(
+      username: String
+    ) extends LoginError
+
+    case object UnexpectedError extends LoginError
+    case class  User(username: String, password: String)
+
+    type LoginResult = Either[LoginError, User]
+
+    // Choose error-handling behaviour based on type:
+    def handleError(error: LoginError): Unit =
+      error match {
+        case UserNotFound(u) =>
+          println(s"User not found: $u")
+        case PasswordIncorrect(u) =>
+          println(s"Password incorrect: $u")
+        case UnexpectedError =>
+          println(s"Unexpected error")
+      }
+    val result1: LoginResult = User("dave", "passw0rd").asRight
+    // result1: LoginResult = Right(User(dave,passw0rd))
+
+    val result2: LoginResult = UserNotFound("dave").asLeft
+    // result2: LoginResult = Left(UserNotFound(dave))
+
+    result1.fold(handleError, println)
+    // User(dave,passw0rd)
+
+    result2.fold(handleError, println)
+    // User not found: dave
   }
 
   def main(args: Array[String]): Unit = {
     Wrap("optionsExamples")(optionsExamples)
     Wrap("listMonads")(listMonads)
     Wrap("defaultInstances")(defaultInstances)
+    Wrap("identityMonad")(identityMonad)
+    Wrap("either")(either)
   }
 }
