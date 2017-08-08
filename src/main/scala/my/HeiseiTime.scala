@@ -4,10 +4,14 @@ import java.time.chrono.JapaneseEra
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField
 
+
 object HeiseiTime {
   def main(args: Array[String]): Unit = {
     import java.time.chrono.{JapaneseChronology, JapaneseDate}
     import java.time.format.DateTimeFormatter
+    import java.time.chrono.JapaneseEra
+    import java.time.format.DateTimeFormatterBuilder
+    import java.time.temporal.ChronoField
 
     import java.time.LocalDate
 
@@ -24,22 +28,36 @@ object HeiseiTime {
     //jpDate: java.time.chrono.JapaneseDate = Japanese Heisei 6-09-27
 
     val jpDateStr = imperialShortFormat.format(jpDate) // String = H060927
-    //jpDateStr: String = H060927
+    //jpDateStr: String = H060927run
 
-    val temporal = imperialShortFormat.parse(jpDateStr)
-    //temporal: java.time.temporal.TemporalAccessor = {},Japanese resolved to Japanese Heisei 106-09-27
+//    val temporal = imperialShortFormat.parse(jpDateStr)
+//    println(temporal)
+//    //temporal: java.time.temporal.TemporalAccessor = {},Japanese resolved to Japanese Heisei 106-09-27
+//
+//    val jpDate2 = LocalDate.from(temporal) //java.time.LocalDate = 2094-09-27
+//    //jpDate: java.time.LocalDate = 2094-09-27
+//    println(jpDate2)
 
-    val jpDate2 = LocalDate.from(temporal) //java.time.LocalDate = 2094-09-27
-    //jpDate: java.time.LocalDate = 2094-09-27
-    println(jpDate2)
+    val basedate: JapaneseDate = JapaneseChronology.INSTANCE.date(JapaneseEra.HEISEI, 1, 1, 8)
+    println(basedate)
+    //Japanese Heisei 1-01-08
 
-    val basedate: JapaneseDate = JapaneseChronology.INSTANCE.date(JapaneseEra.HEISEI, 1989, 1, 1);
-    val dtf: DateTimeFormatter = new DateTimeFormatterBuilder()
-      .appendPattern("GGGGG.")
+    val dtf = new DateTimeFormatterBuilder()
+      .appendPattern("GGGGG")
       .appendValueReduced(ChronoField.YEAR_OF_ERA, 2, 2, basedate)
-      .appendPattern(".MM.dd")
-      .toFormatter().withChronology(JapaneseChronology.INSTANCE)
-    //System.out.printf(" t: %s%n", dtf.parse("H.10.11.12", JapaneseDate.from))
+      .appendPattern("MMdd")
+      .toFormatter()
+      .withChronology(JapaneseChronology.INSTANCE)
 
+    println(dtf.parse("H060927"))
+    //{},Japanese resolved to Japanese Heisei 6-09-27
+
+    println(dtf.format(dtf.parse("H060927")))
+    //H060927
+
+    println(LocalDate.from(dtf.parse("H060927")))
+    //1994-09-27
+
+//    println(dtf.parse("H.10.11.12"))
   }
 }
