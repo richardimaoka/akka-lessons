@@ -632,11 +632,578 @@ object MonadApp {
     // User not found: dave
   }
 
+  def eitherTransform(): Unit ={
+    import cats.syntax.either._
+
+    /**
+     * cats.syntax.either adds a number of useful methods to Either.
+     * We can use orElse and getOrElse to extract values from the right side:
+     *   the right value or return a default:
+     */
+    //def asLeft[B]: Either[A, B] = Left(obj)
+    //    asLeft[RightType]
+    println("Errrrror".asLeft[Int].getOrElse(0))
+    // res9: Int = 0
+
+    //def asRight[B]: Either[B, A] = Right(obj)
+    //    asRight[LeftType]
+    println("Errrrror".asRight[Int].getOrElse(0))
+    //Errrrror
+
+    println("Errrrror".asLeft[Int])
+    //Left("Errrror") : Either[String, Int]
+
+    println(2.asRight[String])
+    //Right(2) : Either[String, Int]
+
+    println("Errrrror".asLeft[Int].orElse(2.asRight[String]))
+    //Right(2) : Either[String,Int]
+
+    //The ensure method allows us to check whether a wrapped value satisfies a predicate:
+    //  def ensure[AA >: A](onFailure: => AA)(f: B => Boolean): Either[AA, B]
+    println(-1.asRight[String].ensure("Must be non-negative!")(_ > 0))
+    // res11: Either[String,Int] = Left(Must be non-negative!)
+
+    "error".asLeft[String] recover {
+      case str: String =>
+      "Recovered from " + str
+    }
+    // res12: Either[String,String] = Right(Recovered from error)
+
+    "error".asLeft[String] recoverWith {
+    case str: String =>
+    Right("Recovered from " + str)
+    }
+    // res13: Either[String,String] = Right(Recovered from error)
+
+    "foo".asLeft[Int].leftMap(_.reverse)
+    // res14: Either[String,Int] = Left(oof)
+
+    6.asRight[String].bimap(_.reverse, _ * 7)
+    // res15: Either[String,Int] = Right(42)
+
+    "bar".asLeft[Int].bimap(_.reverse, _ * 7)
+    // res16: Either[String,Int] = Left(rab)
+
+    123.asRight[String]
+    // res17: Either[String,Int] = Right(123)
+
+    123.asRight[String].swap
+    // res18: scala.util.Either[Int,String] = Left(123)
+  }
+
+  def evalMonad(): Unit = {
+    println("val ---- ")
+    val x = {
+      println("Computing X");
+      1 + 1
+    }
+    // Computing X
+    // x: Int = 2
+
+    println("let's go!")
+    println(x)  // first access
+    // res0: Int = 2
+
+    println(x) // second access
+    // res1: Int = 2
+
+    println("def ---- ")
+
+    def y = {
+      println("Computing Y")
+      1 + 1
+    }
+
+    // y: Int
+
+    println("let's go 2")
+    println(y) // first access
+    // Computing Y
+    // res2: Int = 2
+
+    println(y)  // second access
+    // Computing Y
+    // res3: Int = 2
+
+    println("lazy ---- ")
+    lazy val z = {
+      println("Computing Z")
+      1 + 1
+    }
+    // z: Int = <lazy>
+
+    println("let's go 2")
+    println(z)  // first access
+    // Computing Z
+    // res4: Int = 2
+    println(z)  // second access
+    // res5: Int = 2
+
+    /**
+     * Eval has three subtypes: Eval.Now, Eval.Later, and Eval.Always.
+     */
+    import cats.Eval
+    // import cats.Eval
+    val now = Eval.now(1 + 2)
+    // now: cats.Eval[Int] = Now(3)
+
+    val later = Eval.later(3 + 4)
+    // later: cats.Eval[Int] = cats.Later@49373f5e
+
+    val always = Eval.always(5 + 6)
+    // always: cats.Eval[Int] = cats.Always@53dd8e4b
+
+    println(now.value)
+    // res6: Int = 3
+
+    println(later.value)
+    // res7: Int = 7
+
+    println(always.value)
+    // res8: Int = 11
+  }
+
+  def evalMonad2(): Unit = {
+    import cats.Eval
+
+    println("\nEval.now --- ")
+    val x = Eval.now {
+      println("Computing X")
+      1+1
+    }
+    // Computing X
+
+    println("first access")
+    // x: cats.Eval[Int] = Now(2)
+    x.value // first access
+    // res9: Int = 2
+
+    println("second access")
+    x.value // second access
+    // res10: Int = 2
+
+    println("\nEval.always --- ")
+    val y = Eval.always {
+      println("Computing Y")
+      1+1
+    }
+    // y: cats.Eval[Int] = cats.Always@253eef84
+
+    println("first access")
+    y.value // first access
+    // Computing Y
+    // res11: Int = 2
+
+    println("second access")
+    y.value // second access
+    // Computing Y
+    // res12: Int = 2
+
+    println("\nEval.later --- ")
+    val z = Eval.later {
+      println("Computing Z")
+      1+1
+    }
+    // z: cats.Eval[Int] = cats.Later@a81d4d5
+
+    println("first access")
+    z.value // first access
+    // Computing Z
+    // res13: Int = 2
+
+    println("second access")
+    z.value // second access
+    // res14: Int = 2
+
+    println("\ngreeting ---------")
+    val greeting = Eval.always {
+      println("Step 1")
+      "Hello"
+    }.map { str =>
+      println("Step 2")
+      str + " world"
+    }
+    // greeting: cats.Eval[String] = cats.Eval$$anon$8@3c88d726
+
+    println("First Access")
+    greeting.value
+    // Step 1
+    // Step 2
+    // res15: String = Hello world
+    println("Second Access")
+    greeting.value
+    println("Thrid Access")
+    greeting.value
+
+
+    println("\nfor comprehension ---- ")
+    val ans = for {
+      a <- Eval.now    { println("Calculating A") ; 40 }
+      b <- Eval.always { println("Calculating B") ; 2  }
+    } yield {
+      println("Adding A and B")
+      a+b
+    }
+    // Calculating A
+    // ans: cats.Eval[Int] = cats.Eval$$anon$8@9284e40
+
+    println("first access")
+    ans.value // first access
+    // Calculating B
+    // Adding A and B
+    // res16: Int = 42
+
+    println("second access")
+    ans.value // second access
+    // Calculating B
+    // Adding A and B
+    // res17: Int = 42
+
+    println("\nmemoize --------")
+    val saying = Eval.always {
+      println("Step 1")
+      "The cat"
+    }.map { str =>
+      println("Step 2")
+      s"$str sat on"
+    }.memoize.map { str =>
+      println("Step 3")
+      s"$str the mat"
+    }
+
+    // saying: cats.Eval[String] = cats.Eval$$anon$8@397aee40
+    saying.value // first access
+    // Step 1
+    // Step 2
+    // Step 3
+    // res18: String = The cat sat on the mat
+
+    //Though you used Eval.always, Step 1 and 2 are memoized
+    saying.value // second access
+    // Step 3
+    // res19: String = The cat sat on the mat
+  }
+
+  def stackOverFlow(): Unit ={
+    def factorial(n: BigInt): BigInt =
+      if(n == 1) n else n * factorial(n - 1)
+
+    factorial(50000)
+    // java.lang.StackOverflowError
+    //   ...
+  }
+
+  def stillStackOverFlow(): Unit ={
+    import cats.Eval
+
+    def factorial(n: BigInt): Eval[BigInt] =
+      if(n == 1) Eval.now(n) else factorial(n - 1).map(_ * n)
+
+    factorial(50000).value
+    // java.lang.StackOverflowError
+    //   ...
+  }
+
+  def trampoline(): Unit ={
+    import cats.Eval
+
+    def factorial(n: BigInt): Eval[BigInt] =
+      if(n == 1) {
+        Eval.now(n)
+      } else {
+        Eval.defer(factorial(n - 1).map(_ * n))
+      }
+
+    (factorial(50000).value)
+  }
+
+  def exercise1(): Unit = {
+    def foldRight[A, B](as: List[A], acc: B)(fn: (A, B) => B): B =
+      as match {
+        case head :: tail =>
+          fn(head, foldRight(tail, acc)(fn))
+        case Nil =>
+          acc
+      }
+    foldRight2((1 to 100000).toList, 0)(_ + _)
+
+    import cats.Eval
+
+    //See the difference in the signatures
+    //  def foldRight[A, B](as: List[A], acc: B      )(fn: (A, B)       => B      ): B =
+    def foldRightEval[A, B](as: List[A], acc: Eval[B])(fn: (A, Eval[B]) => Eval[B]): Eval[B] =
+      //Inside the match expression, implementation is the same:
+      as match {
+        case head :: tail =>
+          Eval.defer(fn(head, foldRightEval(tail, acc)(fn)))
+        case Nil =>
+          acc }
+
+    //To make the signature in line
+    //def foldRight[A, B](as: List[A], acc: B)(fn: (A, B) => B): B =
+    def foldRight2[A, B](as: List[A], acc: B)(fn: (A, B) => B): B =
+      foldRightEval(as, Eval.now(acc)) { (a, b) =>
+        b.map(fn(a, _))
+      }.value
+
+    foldRight2((1 to 100000).toList, 0)(_ + _)
+    // res22: Int = 705082704
+  }
+
+  def writerMonad(): Unit ={
+    import cats.data.Writer
+    import cats.instances.vector._
+
+    println(
+      Writer(Vector(
+        "It was the best of times",
+        "It was the worst of times"
+      ), 123)
+    )
+    // res0: cats.data.WriterT[cats.Id,scala.collection.immutable.
+    // Vector[String],Int] = WriterT((Vector(It was the best of times, It was the worst of times),123))
+
+    /**
+     * A Writer[W, A] carries two values: a log of type W and a result of type
+     * In the spirit of code reuse, Cats implements Writer in terms of another type, WriterT.
+     */
+    //type Writer[W, A] = WriterT[Id, W, A]
+
+    import cats.syntax.applicative._ // `pure` method
+    type Logged[A] = Writer[Vector[String], A]
+
+    println(123.pure[Logged])
+    // res2: Logged[Int] = WriterT((Vector(),123))
+
+    /**
+     * If we have a log and no result, we can create a Writer[Unit] using the tell syntax
+     */
+    import cats.syntax.writer._
+    Vector("msg1", "msg2", "msg3").tell
+    // res3: cats.data.Writer[scala.collection.immutable.Vector[String],Unit] = WriterT((Vector(msg1, msg2, msg3),()))
+    //                                                                                        Unit, no result -> ^()
+
+    import cats.syntax.writer._
+    val a = Writer(Vector("msg1", "msg2", "msg3"), 123)
+    // a:    cats.data.WriterT[cats.Id,scala.collection.immutable.Vector[String],Int] = WriterT((Vector(msg1, msg2, msg3),123))
+
+    val b = 123.writer(Vector("msg1", "msg2", "msg3"))
+    // b:    cats.data.Writer[scala.collection.immutable.Vector[String],Int] = WriterT((Vector(msg1, msg2, msg3),123))
+
+
+    /**
+     * We can extract the result and log from a Writer using the
+     *   * `value` and
+     *   * `written`
+     * methods respectively:
+     */
+    a.value
+    // res4: cats.Id[Int] = 123
+    a.written
+    // res5: cats.Id[scala.collection.immutable.Vector[String]] = Vector(msg1, msg2, msg3)
+
+    /**
+     * Or we can extract log and result at the same  me using the run method:
+     */
+    val (log, result) = b.run
+    // log: scala.collection.immutable.Vector[String] = Vector(msg1,msg2, msg3)
+    // result: Int = 123
+  }
+
+  def writerMonadTransform(): Unit ={
+    import cats.data.{Writer}
+    import cats.syntax.applicative._ // `pure` method
+    import cats.syntax.writer._      // `writer` method
+    import cats.instances.vector._
+
+    type Logged[A] = Writer[Vector[String], A]
+
+    //def pure[F[_]](implicit F: Applicative[F]): F[A] = F.pure(a)
+    println(10.pure[Logged])
+    //WriterT((Vector(),10))
+
+    println(Vector("a", "b", "c").tell)
+    //WriterT((Vector(a, b, c),())) <- tell has no result
+
+    println(32.writer(Vector("x", "y", "z")))
+    //WriterT((Vector(x, y, z),32))
+
+    /**
+     * flatMap actually appends the logs from the source Writer and the re- sult of the user’s sequencing func on.
+     */
+    val writer1 = for {
+      a <- 10.pure[Logged]
+      _ <- Vector("a", "b", "c").tell
+      b <- 32.writer(Vector("x", "y", "z"))
+    } yield a + b
+    // writer1: cats.data.WriterT[cats.Id,Vector[String],Int] = WriterT((Vector(a, b, c, x, y, z),42))
+    println("writer1")
+    println(writer1.run)
+    // res6: cats.Id[(Vector[String], Int)] = (Vector(a, b, c, x, y, z),42)
+
+    /**
+     * In addition to transforming the result with map and flatMap,
+     * we can transform the log in a Writer with the mapWritten method:
+     */
+    val writer2 = writer1.mapWritten(_.map(_.toUpperCase))
+      // writer2: cats.data.WriterT[cats.Id,scala.collection.immutabl.Vector[String],Int]
+      // = WriterT((Vector(A, B, C, X, Y, Z),42))
+
+    println("writer2")
+    println(writer2.run)
+    // res7: cats.Id[(scala.collection.immutable.Vector[String], Int)] = (Vector(A, B, C, X, Y, Z),42)
+
+    /**
+     * We can tranform both log and result simultaneously using bimap or mapBoth.
+     */
+    val writer3 = writer1.bimap(
+      log    => log.map(_.toUpperCase),
+      result => result * 100
+    )
+    // writer3: cats.data.WriterT[cats.Id,scala.collection.immutable
+    //.Vector[String],Int] = WriterT((Vector(A, B, C, X, Y, Z),4200))
+
+    println("writer3")
+    println(writer3.run)
+    // res8: cats.Id[(scala.collection.immutable.Vector[String], Int)] = (Vector(A, B, C, X, Y, Z),4200)
+
+    val writer4 = writer1.mapBoth { (log, result) =>
+      val log2    = log.map(_ + "!")
+      val result2 = result * 1000
+      (log2, result2)
+    }
+    // writer4: cats.data.WriterT[cats.Id,scala.collection.immutable.Vector[String],Int]
+    // = WriterT((Vector(a!, b!, c!, x!, y!, z!),42000))
+
+    println("writer4")
+    println(writer4.run)
+    // res9: cats.Id[(scala.collection.immutable.Vector[String], Int)] = (Vector(a!, b!, c!, x!, y!, z!),42000)
+
+    /**
+     * Finally, we can clear the log with the reset method and swap log and result with the swap method:
+     */
+    val writer5 = writer1.reset
+    // writer5: cats.data.WriterT[cats.Id,Vector[String],Int] = WriterT((Vector(),42))
+
+    println("writer5")
+    println(writer5.run)
+    // res10: cats.Id[(Vector[String], Int)] = (Vector(),42)
+    val writer6 = writer1.swap
+    // writer6: cats.data.WriterT[cats.Id,Int,Vector[String]] = WriterT((42,Vector(a, b, c, x, y, z)))
+
+    println("writer6")
+    println(writer6.run)
+    // res11: cats.Id[(Int, Vector[String])] = (42,Vector(a, b, c, x, y, z))
+  }
+
+  def exerciseWriterMonad(): Unit ={
+    def slowly[A](body: => A) =
+      try body finally Thread.sleep(100)
+
+    def factorial(n: Int): Int = {
+      val ans = slowly(if(n == 0) 1 else n * factorial(n - 1))
+      println(s"fact $n $ans")
+      ans
+    }
+
+    factorial(5)
+    // fact 0 1
+    // fact 1 1
+    // fact 2 2
+    // fact 3 6
+    // fact 4 24
+    // fact 5 120
+    // res13: Int = 120
+
+
+    import scala.concurrent._
+    import scala.concurrent.ExecutionContext.Implicits.global
+    import scala.concurrent.duration._
+
+    /**
+     * Let's do this parallely!
+     *  -> Interleaving log messages from two future executions
+     */
+    println()
+    Await.result(Future.sequence(Vector(
+      Future(factorial(3)),
+      Future(factorial(3))
+    )), 5.seconds)
+    // fact 0 1
+    // fact 0 1
+    // fact 1 1
+    // fact 1 1
+    // fact 2 2
+    // fact 2 2
+    // fact 3 6
+    // fact 3 6
+    // res14: scala.collection.immutable.Vector[Int] =
+    //   Vector(120, 120)
+
+    /**
+     * Solution
+     */
+    println()
+    //We’ll start by defining a type alias for Writer so we can use it with pure syntax:
+    import cats.data.Writer
+    import cats.syntax.applicative._ // `pure` method
+    import cats.instances.vector._
+
+    type Logged[A] = Writer[Vector[String], A]
+    42.pure[Logged]
+
+    //We’ll import the tell syntax as well:
+    import cats.syntax.writer._
+    Vector("Message").tell
+    // res16: cats.data.Writer[scala.collection.immutable.Vector[String],Unit] = WriterT((Vector(Message),()))
+
+    //Finally, we’ll import the Semigroup instance for Vector. We need this to map and flatMap over Logged:
+    import cats.instances.vector._
+    41.pure[Logged].map(_ + 1)
+    // res17: cats.data.WriterT[cats.Id,Vector[String],Int] = WriterT((Vector(),42))
+
+    def factorial2(n: Int): Logged[Int] =
+      for {
+        ans <- if(n == 0) {
+          1.pure[Logged]
+        } else {
+          slowly(factorial2(n - 1).map(_ * n))
+        }
+        _   <- Vector(s"fact $n $ans").tell
+      } yield ans
+
+    val (log, result) = factorial2(5).run
+    // log: Vector[String] = Vector(fact 0 1, fact 1 1, fact 2 2, fact 3 6, fact 4 24, fact 5 120)
+    // result: Int = 120
+
+    val Vector((logA, ansA), (logB, ansB)) =
+      Await.result(Future.sequence(Vector(
+        Future(factorial2(5).run),
+        Future(factorial2(5).run)
+      )), 5.seconds)
+    println(logA)
+    // logA: Vector[String] = Vector(fact 0 1, fact 1 1, fact 2 2, fact 3 6, fact 4 24, fact 5 120)
+    // ansA: Int = 120
+    println(logB)
+    // logB: Vector[String] = Vector(fact 0 1, fact 1 1, fact 2 2, fact 3 6, fact 4 24, fact 5 120)
+    // ansB: Int = 120
+  }
+
   def main(args: Array[String]): Unit = {
     Wrap("optionsExamples")(optionsExamples)
     Wrap("listMonads")(listMonads)
     Wrap("defaultInstances")(defaultInstances)
     Wrap("identityMonad")(identityMonad)
     Wrap("either")(either)
+    Wrap("eitherTransform")(eitherTransform)
+    Wrap("evalMonad")(evalMonad)
+    Wrap("evalMonad2")(evalMonad2)
+    //Wrap("stackOverFlow")(stackOverFlow)
+    Wrap("trampoline")(trampoline)
+    Wrap("exercise1")(exercise1)
+    Wrap("writerMonad")(writerMonad)
+    Wrap("writerMonadTransform")(writerMonadTransform)
+    Wrap("exerciseWriterMonad")(exerciseWriterMonad)
   }
 }
