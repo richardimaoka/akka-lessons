@@ -59,6 +59,45 @@ object SourceQueue {
     println(sb.toString())
   }
 
+  /**
+   * QueueSourceSpec -> "fail offer future when stream is completed"
+   */
+  def sourceQueueFuture(): Unit ={
+    val sinkSubscriber = TestSubscriber.manualProbe[Int]()
+    // Source.to is Keep.left
+    val queue = Source.queue(1, OverflowStrategy.dropNew).to(Sink.fromSubscriber(sinkSubscriber)).run()
+
+    val subscription = sinkSubscriber.expectSubscription
+
+    import scala.concurrent.ExecutionContext.Implicits.global
+    val fut = queue.offer(1)
+    fut.onComplete{
+      case Success(x) => println(s"success: ${x}") //success: Enqueued
+      case Failure(x) => println(s"failure: ${x}")
+    }
+
+    val fut2 = queue.offer(1)
+    fut2.onComplete{
+      case Success(x) => println(s"success: ${x}") //success: Dropped
+      case Failure(x) => println(s"failure: ${x}")
+    }
+
+    subscription.cancel()
+    Thread.sleep(500)
+
+    queue.offer(1).failed.foreach{
+      e => println(s"${e}")
+      //failure: java.lang.IllegalStateException: Stream is terminated. SourceQueue is detached
+    }
+
+    val fut3 = queue.offer(1)
+    fut3.onComplete{
+      case Success(x) => println(s"success: ${x}") //success: Dropped
+      case Failure(x) => println(s"failure: ${x}")
+    }
+    //This future does not complete
+  }
+
   def main(args: Array[String]): Unit = {
     try{
       Wrapper("sourceQueue")(sourceQueue)
@@ -72,6 +111,7 @@ object SourceQueue {
       Wrapper("sourceQueueOverflow")(sourceQueueOverflow(5, OverflowStrategy.dropTail))
       Wrapper("sourceQueueOverflow")(sourceQueueOverflow(5, OverflowStrategy.dropHead))
       Wrapper("sourceQueueOverflow")(sourceQueueOverflow(5, OverflowStrategy.dropNew))
+      Wrapper("sourceQueueFuture")(sourceQueueFuture)
     }
     finally {
       println("terminating the system")
