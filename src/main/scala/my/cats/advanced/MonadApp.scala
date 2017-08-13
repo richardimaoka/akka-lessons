@@ -1190,6 +1190,122 @@ object MonadApp {
     // ansB: Int = 120
   }
 
+  def stateMonad(): Unit = {
+    import cats.data.State
+    val a = State[Int, String] { state =>
+      (state, s"The state is $state")
+    }
+    println(a)
+    // a: cats.data.State[Int,String] = cats.data.StateT@ad944e3
+
+    // Get the state and the result:
+    val (state1, result1) = a.run(10).value
+    // state: Int = 10
+    // result: String = The state is 10
+
+    // Get the state, ignore the result:
+    val state2 = a.runS(10).value
+    // state: Int = 10
+
+    // Get the result, ignore the state:
+    val result2 = a.runA(10).value
+
+    println(state1)
+    println(state2)
+    println(result1)
+    println(result2)
+
+    /**
+     * Composing and transforming state
+     */
+    val step1 = State[Int, String] { num =>
+      val ans = num + 1
+      (ans, s"Result of step1: $ans")
+    }
+    // step1: cats.data.State[Int,String] = cats.data.StateT@e680f25
+    println(s"step1: ${step1}")
+
+    val step2 = State[Int, String] { num =>
+      val ans = num * 2
+      (ans, s"Result of step2: $ans")
+    }
+    println(s"step2: ${step2}")
+    // step2: cats.data.State[Int,String] = cats.data.StateT@1119acde
+
+    val both = for {
+      a <- step1
+      b <- step2
+    } yield (b, a)
+
+    /**
+     * Hmmmm why the tuple becomes cats.data.StateT ... ?
+     */
+    println(s"both: ${both}")
+    // both: cats.data.StateT[cats.Eval,Int,(String, String)] = cats.data.StateT@2d4d4ff3
+
+    val (state3, result3) = both.run(20).value
+    // state: Int = 42
+    // result: (String, String) = (Result of step1: 21,Result of step2: 42)
+
+    println(s"state3: ${state3}")
+    println(s"result3: ${result3}")
+
+    /**
+     * Using flatMap & map intead of for comprehension.
+     * Hmmmm why the tuple becomes cats.data.StateT ... ?
+     */
+    val bothequivalent = step1.flatMap {
+      a => step2.map(b => (a, b))
+    }
+    println(s"bothequivalent: ${bothequivalent}")
+    //bothequivalent: cats.data.StateT@31b0f1a8
+
+    val (state4, result4) = bothequivalent.run(20).value
+    println(s"state4: ${state4}")
+    println(s"result4: ${result4}")
+  }
+
+  def stateProgram(): Unit =  {
+    import cats.data.State
+
+    val getDemo = State.get[Int]
+    // getDemo: cats.data.State[Int,Int] = cats.data.StateT@26c929b1
+    getDemo.run(10).value
+    // res3: (Int, Int) = (10,10)
+    val setDemo = State.set[Int](30)
+    // setDemo: cats.data.State[Int,Unit] = cats.data.StateT@1748341a
+    setDemo.run(10).value
+    // res4: (Int, Unit) = (30,())
+    val pureDemo = State.pure[Int, String]("Result")
+    // pureDemo: cats.data.State[Int,String] = cats.data.StateT@1826901
+    pureDemo.run(10).value
+    // res5: (Int, String) = (10,Result)
+    val inspectDemo = State.inspect[Int, String](_ + "!")
+    // inspectDemo: cats.data.State[Int,String] = cats.data.StateT@77e7bb7e
+      inspectDemo.run(10).value
+    // res6: (Int, String) = (10,10!)
+
+    val modifyDemo = State.modify[Int](_ + 1)
+    // modifyDemo: cats.data.State[Int,Unit] = cats.data.StateT@56cf32b8
+    modifyDemo.run(10).value
+    // res7: (Int, Unit) = (11,())
+
+    import State._
+    val program: State[Int, (Int, Int, Int)] = for {
+      a <- get[Int]
+      _ <- set[Int](a + 1)
+      b <- get[Int]
+      _ <- modify[Int](_ + 1)
+      c <- inspect[Int, Int](_ * 1000)
+    } yield (a, b, c)
+    // program: cats.data.State[Int,(Int, Int, Int)] = cats.data.StateT@4996bc50
+    val (state, result) = program.run(1).value
+    // state: Int = 3
+    // result: (Int, Int, Int) = (1,2,3000)
+    println(state)
+    println(result)
+  }
+
   def main(args: Array[String]): Unit = {
     Wrap("optionsExamples")(optionsExamples)
     Wrap("listMonads")(listMonads)
@@ -1205,5 +1321,7 @@ object MonadApp {
     Wrap("writerMonad")(writerMonad)
     Wrap("writerMonadTransform")(writerMonadTransform)
     Wrap("exerciseWriterMonad")(exerciseWriterMonad)
+    Wrap("stateMonad")(stateMonad)
+    Wrap("stateProgram")(stateProgram)
   }
 }
