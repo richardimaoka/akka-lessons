@@ -172,8 +172,65 @@ object MonadTransformerApp {
     //OptionT(Right(Some(123)))
     println(stack2.value)
     //Right(Some(123))
-  }
 
+    println("****************************")
+
+    import cats.instances.vector._
+    import cats.data.{Writer, EitherT, OptionT}
+
+    type Logged[A] = Writer[Vector[String], A]
+    type LoggedFallable[A] = EitherT[Logged, String, A]
+    type LoggedFallableOption[A] = OptionT[LoggedFallable, A]
+
+    val packed = 123.pure[LoggedFallableOption]
+    println(packed)
+    // packed: LoggedFallableOption[Int] = OptionT(EitherT(WriterT((Vector(),Right(Some(123))))))
+
+    val partiallyPacked = packed.value
+    println(partiallyPacked)
+    // partiallyPacked: LoggedFallable[Option[Int]] = EitherT(WriterT((Vector(),Right(Some(123)))))
+
+    val completelyUnpacked = partiallyPacked.value
+    println(completelyUnpacked)
+    // completelyUnpacked: Logged[Either[String,Option[Int]]] = WriterT((Vector(),Right(Some(123))))
+  }
+/*
+  def patterns(): Unit ={
+    import cats.data.Writer
+    type Logged[A] = Writer[List[String], A]
+
+    // Example method that returns nested monads:
+    def parseNumber(str: String): Logged[Option[Int]] =
+      util.Try(str.toInt).toOption match {
+        case Some(num) => Writer(List(s"Read $str"), Some(num))
+        case None => Writer(List(s"Failed on $str"), None)
+      }
+
+    // Example combining multiple calls to parseNumber:
+    def addNumbers(
+      a: String,
+      b: String,
+      c: String
+    ): Logged[Option[Int]] = {
+      import cats.data.OptionT
+      // Transform the incoming stacks to work on them:
+      val result = for {
+        a <- OptionT(parseNumber(a))
+        b <- OptionT(parseNumber(b))
+        c <- OptionT(parseNumber(c))
+      } yield a + b + c
+      // Return the untransformed monad stack:
+      result.value
+    }
+
+    // This approach doesn't force OptionT on other users' code:
+    val result1 = addNumbers("1", "2", "3")
+    // result1: Logged[Option[Int]] = WriterT((List(Read 1, Read 2, Read 3),Some(6)))
+
+    val result2 = addNumbers("1", "a", "3")
+    // result2: Logged[Option[Int]] = WriterT((List(Read 1, Failed on a),None))
+  }
+*/
   def main(args: Array[String]): Unit = {
     Wrap("pre")(pre)
     Wrap("transformativeExample")(transformativeExample)
