@@ -47,7 +47,7 @@ lazy val lesson1 = (project in file(".")).
       "org.slf4j" % "slf4j-simple" % "1.7.7",
 
       "org.zalando" %% "grafter" % "1.7.0",
-      "org.atnos" %% "eff" % "4.4.0",
+      "org.atnos" %% "eff" % "4.5.0",
 
       "com.github.mpilquist" %% "simulacrum" % "0.10.0",
       "org.scalamacros" %% "resetallattrs" % "1.0.0",
