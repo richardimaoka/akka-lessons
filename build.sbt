@@ -1,3 +1,6 @@
+// to write types like Reader[String, ?]
+addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
+
 lazy val lesson1 = (project in file(".")).
   settings(
     name         := "lessons",
