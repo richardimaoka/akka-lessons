@@ -8,7 +8,7 @@ import scala.concurrent.{Await, Future}
 
 object AwaitSampl {
 
-  def main(args: Array[String]) = {
+  def main(args: Array[String]): Unit = {
 
     implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
     val f = Future{

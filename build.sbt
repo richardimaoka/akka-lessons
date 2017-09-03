@@ -55,6 +55,9 @@ lazy val lesson1 = (project in file(".")).
       "com.github.mpilquist" %% "simulacrum" % "0.10.0",
       "org.scalamacros" %% "resetallattrs" % "1.0.0",
 
-      "org.typelevel" %% "cats" % "0.9.0"
+      "org.typelevel" %% "cats-core" % "1.0.0-MF",
+      "org.typelevel" %% "cats-free" % "1.0.0-MF",
+      "org.typelevel" %% "cats-laws" % "1.0.0-MF",
+      "org.typelevel" %% "cats-mtl-core" % "0.0.2"
     )
   )

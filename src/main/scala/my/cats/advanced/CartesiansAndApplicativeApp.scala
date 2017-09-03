@@ -145,7 +145,7 @@ object CartesiansAndApplicativeApp {
     import cats.instances.list._
     import cats.instances.string._
     import cats.syntax.cartesian._
-
+    import cats.syntax.apply._
     /**
      * Cartesian builders also have a contramap and imap methods that accept
      * Contravariant and Invariant functors.
@@ -159,19 +159,19 @@ object CartesiansAndApplicativeApp {
     def catToTuple(cat: Cat) =
       (cat.name, cat.yearOfBirth, cat.favoriteFoods)
 
-    /**
-     * def imap[Z](f: (A0, A1, A2) => Z)(g: Z => (A0, A1, A2))
-     * (implicit invariant: Invariant[F], cartesian: Cartesian[F]): F[Z]
-     *   = Cartesian.imap3(a0, a1, a2)(f)(g)
-     */
-    implicit val catMonoid = (
-      Monoid[String] |@|
-        Monoid[Int] |@|
-        Monoid[List[String]]
-      ).imap(Cat.apply)(catToTuple)
-
-    println(catMonoid)
-    //cats.KernelInvariantMonoidalInstances$$anon$3$$anon$5@7ef36dae
+//    /**
+//     * def imap[Z](f: (A0, A1, A2) => Z)(g: Z => (A0, A1, A2))
+//     * (implicit invariant: Invariant[F], cartesian: Cartesian[F]): F[Z]
+//     *   = Cartesian.imap3(a0, a1, a2)(f)(g)
+//     */
+//    implicit val catMonoid = (
+//      Monoid[String],
+//        Monoid[Int],
+//        Monoid[List[String]]
+//      ).imap(Cat.apply)(catToTuple(_))
+//
+//    println(catMonoid)
+//    //cats.KernelInvariantMonoidalInstances$$anon$3$$anon$5@7ef36dae
   }
 
   def main(args: Array[String]): Unit ={

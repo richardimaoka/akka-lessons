@@ -185,13 +185,13 @@ object ConstApp {
         def ap[A, B](f: Const[Z, A => B])(fa: Const[Z, A]): Const[Z, B] = ???
       }
 
-    implicit def constApplicative2[Z : Monoid]: Applicative[Const[Z, ?]] =
-      new Applicative[Const[Z, ?]] {
-        def pure[A](a: A): Const[Z, A] = Const(Monoid[Z].empty)
-
-        def ap[A, B](f: Const[Z, A => B])(fa: Const[Z, A]): Const[Z, B] =
-          Const(Monoid[Z].combine(fa.getConst, f.getConst))
-      }
+//    implicit def constApplicative2[Z : Monoid]: Applicative[Const[Z, ?]] =
+//      new Applicative[Const[Z, ?]] {
+//        def pure[A](a: A): Const[Z, A] = Const(Monoid[Z].empty)
+//
+//        def ap[A, B](f: Const[Z, A => B])(fa: Const[Z, A]): Const[Z, B] =
+//          Const(Monoid[Z].combine(fa.getConst, f.getConst))
+//      }
 
     trait Traverse3[F[_]] extends Foldable[F] {
       def traverse[G[_] : Applicative, A, X](fa: F[A])(f: A => G[X]): G[F[X]]
