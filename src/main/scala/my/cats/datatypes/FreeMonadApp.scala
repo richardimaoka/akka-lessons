@@ -39,6 +39,43 @@ object FreeMonadApp {
     object DataSource {
       implicit def dataSource[F[_]](implicit I: InjectK[DataOp, F]): DataSource[F] = new DataSource[F]
     }
+
+
+    def program(implicit I : Interacts[CatsApp], D : DataSource[CatsApp]): Free[CatsApp, Unit] = {
+      import I._, D._
+
+      for {
+        cat <- ask("What's the kitty's name?")
+        _ <- addCat(cat)
+        cats <- getAllCats
+        _ <- tell(cats.toString)
+      } yield ()
+    }
+
+    object ConsoleCatsInterpreter extends (Interact ~> Id) {
+      def apply[A](i: Interact[A]) = i match {
+        case Ask(prompt) =>
+          println(prompt)
+          readLine()
+        case Tell(msg) =>
+          println(msg)
+      }
+    }
+
+    object InMemoryDatasourceInterpreter extends (DataOp ~> Id) {
+
+      private[this] val memDataSet = new ListBuffer[String]
+
+      def apply[A](fa: DataOp[A]) = fa match {
+        case AddCat(a) => memDataSet.append(a); ()
+        case GetAllCats() => memDataSet.toList
+      }
+    }
+
+    val interpreter: CatsApp ~> Id = InMemoryDatasourceInterpreter or ConsoleCatsInterpreter
+
+    val evaled: Unit = program.foldMap(interpreter)
+    println(evaled)
   }
 
 
